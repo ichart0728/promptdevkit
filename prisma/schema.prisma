@@ -6,11 +6,176 @@
 
 generator client {
   provider = "prisma-client-js"
-  output = "../src/generated/prisma"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
   provider          = "postgresql"
   url               = env("DATABASE_URL")
   shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+}
+
+enum TeamRole {
+  member
+  editor
+  viewer
+  admin
+}
+
+model User {
+  id            String        @id @default(cuid())
+  name          String?
+  email         String?       @unique
+  emailVerified DateTime?
+  image         String?
+  deletedAt     DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  accounts      Account[]
+  sessions      Session[]
+  personalPrompts Prompt[]    @relation("PersonalOwner")
+  createdPrompts  Prompt[]    @relation("CreatedBy")
+  teamMemberships TeamMember[]
+  ownedTeams      Team[]      @relation("TeamOwner")
+  runLogs         RunLog[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@index([expires])
+}
+
+model Team {
+  id        String        @id @default(cuid())
+  name      String
+  ownerId   String?
+  deletedAt DateTime?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  owner     User?         @relation("TeamOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  members   TeamMember[]
+  prompts   Prompt[]      @relation("PromptTeam")
+}
+
+model TeamMember {
+  id        String   @id @default(cuid())
+  teamId    String
+  userId    String
+  role      TeamRole @default(member)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@index([userId])
+}
+
+model Prompt {
+  id           String         @id @default(cuid())
+  title        String
+  body         String
+  variables    Json
+  logging      Boolean        @default(false)
+  ownerId      String?
+  teamId       String?
+  createdById  String?
+  archivedAt   DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  owner     User?  @relation("PersonalOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  team      Team?  @relation("PromptTeam", fields: [teamId], references: [id], onDelete: SetNull)
+  createdBy User?  @relation("CreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  versions  PromptVersion[]
+  runLogs   RunLog[]
+  tags      TagOnPrompt[]
+
+  @@check(ownerXorTeam, (ownerId IS NOT NULL) <> (teamId IS NOT NULL))
+  @@index([ownerId, updatedAt])
+  @@index([teamId, updatedAt])
+}
+
+model PromptVersion {
+  id        String   @id @default(cuid())
+  promptId  String
+  version   Int
+  title     String
+  body      String
+  variables Json
+  createdAt DateTime @default(now())
+
+  prompt Prompt @relation(fields: [promptId], references: [id], onDelete: Cascade)
+
+  @@unique([promptId, version])
+}
+
+model RunLog {
+  id        String   @id @default(cuid())
+  promptId  String
+  userId    String?
+  variables Json
+  result    String?
+  createdAt DateTime @default(now())
+
+  prompt Prompt @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([promptId, createdAt])
+  @@index([userId, createdAt])
+}
+
+model Tag {
+  id        String        @id @default(cuid())
+  name      String        @unique
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  prompts   TagOnPrompt[]
+
+  @@check(nameIsLowercase, name = lower(name))
+  @@check(nameIsTrimmed, btrim(name) = name)
+}
+
+model TagOnPrompt {
+  promptId String
+  tagId    String
+  createdAt DateTime @default(now())
+
+  prompt Prompt @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([promptId, tagId])
 }
