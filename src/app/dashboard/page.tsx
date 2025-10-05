@@ -1,95 +1,192 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { PromptForm } from "@/components/prompts/PromptForm";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+
+import { CreatePromptDialog } from "@/components/prompts/CreatePromptDialog";
 import { PromptList } from "@/components/prompts/PromptList";
-import { RunPanel } from "@/components/prompts/RunPanel";
-import { PromptWithTags } from "@/types/prompt";
 import { getPrompts } from "@/lib/api";
+import { normalizeTag } from "@/lib/tag";
+import { PromptWithTags } from "@/types/prompt";
+
+const sortTags = (values: string[]) => [...values].sort((a, b) => a.localeCompare(b));
+
+const arraysEqual = (a: string[], b: string[]) => {
+  if (a.length !== b.length) return false;
+  const sortedA = sortTags(a);
+  const sortedB = sortTags(b);
+  return sortedA.every((value, index) => value === sortedB[index]);
+};
+
+const promptMatchesFilters = (
+  prompt: PromptWithTags,
+  query: string,
+  tags: string[]
+): boolean => {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (normalizedQuery) {
+    const haystack = `${prompt.title} ${prompt.body}`.toLowerCase();
+    if (!haystack.includes(normalizedQuery)) {
+      return false;
+    }
+  }
+  if (tags.length) {
+    const promptTags = new Set(
+      prompt.tags.map(({ tag }) => normalizeTag(tag.name)).filter(Boolean)
+    );
+    return tags.every((tag) => promptTags.has(tag));
+  }
+  return true;
+};
 
 export default function DashboardPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const initialSearch = searchParams.get("q") ?? "";
+  const initialTags = useMemo(
+    () => sortTags(searchParams.getAll("tag").map(normalizeTag).filter(Boolean)),
+    [searchParams]
+  );
+
+  const [searchInput, setSearchInput] = useState(initialSearch);
+  const [searchTerm, setSearchTerm] = useState(initialSearch);
+  const [selectedTags, setSelectedTags] = useState<string[]>(initialTags);
+  const [debouncedTags, setDebouncedTags] = useState<string[]>(initialTags);
   const [prompts, setPrompts] = useState<PromptWithTags[]>([]);
+  const [availableTags, setAvailableTags] = useState<string[]>(
+    Array.from(new Set(initialTags)).sort((a, b) => a.localeCompare(b))
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
-  const [tag, setTag] = useState("");
-  const [selectedPromptId, setSelectedPromptId] = useState<string | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
-  const loadPrompts = useCallback(async (qValue: string, tagValue: string) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await getPrompts(qValue || undefined, tagValue || undefined);
-      setPrompts(data);
-      setSelectedPromptId((current) => {
-        if (current && data.some((prompt) => prompt.id === current)) {
-          return current;
-        }
-        return data.length > 0 ? data[0].id : null;
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load prompts.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const requestRef = useRef(0);
 
   useEffect(() => {
-    loadPrompts("", "");
-  }, [loadPrompts]);
+    const handle = window.setTimeout(() => {
+      setDebouncedTags(selectedTags);
+    }, 200);
+    return () => window.clearTimeout(handle);
+  }, [selectedTags]);
 
-  const handleFilterChange = useCallback(
-    async (nextQuery: string, nextTag: string) => {
-      setQuery(nextQuery);
-      setTag(nextTag);
-      await loadPrompts(nextQuery, nextTag);
+  useEffect(() => {
+    const paramsSearch = searchParams.get("q") ?? "";
+    const paramsTags = sortTags(searchParams.getAll("tag").map(normalizeTag).filter(Boolean));
+
+    setSearchInput((prev) => (prev === paramsSearch ? prev : paramsSearch));
+    setSearchTerm((prev) => (prev === paramsSearch ? prev : paramsSearch));
+    setSelectedTags((prev) => (arraysEqual(prev, paramsTags) ? prev : paramsTags));
+    setDebouncedTags((prev) => (arraysEqual(prev, paramsTags) ? prev : paramsTags));
+  }, [searchParams]);
+
+  const loadPrompts = useCallback(
+    async (query: string, tags: string[]) => {
+      const requestId = ++requestRef.current;
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await getPrompts(query || undefined, tags);
+        if (requestId !== requestRef.current) return;
+        const sorted = [...data].sort(
+          (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        );
+        setPrompts(sorted);
+        const tagSet = new Set(tags);
+        sorted.forEach((prompt) => {
+          prompt.tags.forEach(({ tag }) => {
+            const normalized = normalizeTag(tag.name);
+            if (normalized) tagSet.add(normalized);
+          });
+        });
+        setAvailableTags(Array.from(tagSet).sort((a, b) => a.localeCompare(b)));
+      } catch (err) {
+        if (requestId !== requestRef.current) return;
+        setError(err instanceof Error ? err.message : "Failed to load prompts.");
+      } finally {
+        if (requestId === requestRef.current) {
+          setLoading(false);
+        }
+      }
     },
-    [loadPrompts]
+    []
   );
+
+  useEffect(() => {
+    loadPrompts(searchTerm, debouncedTags);
+  }, [loadPrompts, searchTerm, debouncedTags]);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (searchTerm.trim()) params.set("q", searchTerm.trim());
+    debouncedTags.forEach((tag) => {
+      if (tag) params.append("tag", tag);
+    });
+    const next = params.toString();
+    const current = searchParams.toString();
+    if (next === current) return;
+    router.replace(`${pathname}${next ? `?${next}` : ""}`, { scroll: false });
+  }, [pathname, router, searchTerm, debouncedTags, searchParams]);
 
   const handleRetry = useCallback(() => {
-    loadPrompts(query, tag);
-  }, [loadPrompts, query, tag]);
+    loadPrompts(searchTerm, debouncedTags);
+  }, [loadPrompts, searchTerm, debouncedTags]);
 
-  const handleCreated = useCallback(
-    async (_prompt: PromptWithTags) => {
-      await loadPrompts(query, tag);
+  const handlePromptCreated = useCallback(
+    (prompt: PromptWithTags) => {
+      setPrompts((current) => {
+        const filtered = current.filter((item) => item.id !== prompt.id);
+        if (!promptMatchesFilters(prompt, searchTerm, debouncedTags)) {
+          return filtered;
+        }
+        return [prompt, ...filtered];
+      });
+      setAvailableTags((current) => {
+        const tagSet = new Set(current);
+        prompt.tags.forEach(({ tag }) => {
+          const normalized = normalizeTag(tag.name);
+          if (normalized) tagSet.add(normalized);
+        });
+        return Array.from(tagSet).sort((a, b) => a.localeCompare(b));
+      });
+      setError(null);
     },
-    [loadPrompts, query, tag]
+    [debouncedTags, searchTerm]
   );
 
-  const selectedPrompt = useMemo(
-    () => prompts.find((prompt) => prompt.id === selectedPromptId) ?? null,
-    [prompts, selectedPromptId]
-  );
+  const handleAddPrompt = () => {
+    setDialogOpen(true);
+  };
 
   return (
-    <main className="min-h-screen bg-gray-100 p-6">
-      <div className="mx-auto flex max-w-6xl flex-col gap-6">
+    <main className="min-h-screen bg-slate-50 px-6 py-10 text-slate-900 transition-colors dark:bg-slate-950 dark:text-slate-100">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
         <header className="flex flex-col gap-2">
-          <h1 className="text-2xl font-semibold text-gray-900">Prompt Dashboard</h1>
-          <p className="text-sm text-gray-600">
-            Manage your prompts, create new ones, and run them with dynamic variables.
+          <h1 className="text-3xl font-semibold tracking-tight">Prompt QX</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Browse, search, and curate prompts with a focus on clarity.
           </p>
         </header>
-        <div className="grid gap-6 lg:grid-cols-[2fr_3fr]">
-          <div className="flex flex-col gap-6">
-            <PromptForm onCreated={handleCreated} />
-            <PromptList
-              prompts={prompts}
-              loading={loading}
-              error={error}
-              query={query}
-              tag={tag}
-              selectedId={selectedPromptId}
-              onSelect={(prompt) => setSelectedPromptId(prompt.id)}
-              onFilterChange={handleFilterChange}
-              onRetry={handleRetry}
-            />
-          </div>
-          <RunPanel prompt={selectedPrompt} />
-        </div>
+        <PromptList
+          prompts={prompts}
+          loading={loading}
+          error={error}
+          searchValue={searchInput}
+          onSearchInputChange={setSearchInput}
+          onSearchDebouncedChange={setSearchTerm}
+          selectedTags={selectedTags}
+          availableTags={availableTags}
+          onTagChange={setSelectedTags}
+          onRetry={handleRetry}
+          onAddPrompt={handleAddPrompt}
+        />
       </div>
+      <CreatePromptDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        onCreated={handlePromptCreated}
+      />
     </main>
   );
 }
