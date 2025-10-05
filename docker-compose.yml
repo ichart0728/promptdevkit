@@ -18,6 +18,11 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    command: >
+      postgres
+      -c log_statement=ddl
+      -c log_min_error_statement=log
+      -c client_min_messages=log
 
   pgadmin:
     image: dpage/pgadmin4:8
