@@ -6,7 +6,7 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../src/generated/prisma"
+  // output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -23,20 +23,20 @@ enum TeamRole {
 }
 
 model User {
-  id            String        @id @default(cuid())
-  name          String?
-  email         String?       @unique
-  emailVerified DateTime?
-  image         String?
-  deletedAt     DateTime?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  accounts      Account[]
-  sessions      Session[]
-  personalPrompts Prompt[]    @relation("PersonalOwner")
-  createdPrompts  Prompt[]    @relation("CreatedBy")
+  id              String       @id @default(cuid())
+  name            String?
+  email           String?      @unique
+  emailVerified   DateTime?
+  image           String?
+  deletedAt       DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  accounts        Account[]
+  sessions        Session[]
+  personalPrompts Prompt[]     @relation("PersonalOwner")
+  createdPrompts  Prompt[]     @relation("CreatedBy")
   teamMemberships TeamMember[]
-  ownedTeams      Team[]      @relation("TeamOwner")
+  ownedTeams      Team[]       @relation("TeamOwner")
   runLogs         RunLog[]
 }
 
@@ -77,15 +77,15 @@ model VerificationToken {
 }
 
 model Team {
-  id        String        @id @default(cuid())
+  id        String       @id @default(cuid())
   name      String
   ownerId   String?
   deletedAt DateTime?
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
-  owner     User?         @relation("TeamOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  owner     User?        @relation("TeamOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   members   TeamMember[]
-  prompts   Prompt[]      @relation("PromptTeam")
+  prompts   Prompt[]     @relation("PromptTeam")
 }
 
 model TeamMember {
@@ -104,27 +104,26 @@ model TeamMember {
 }
 
 model Prompt {
-  id           String         @id @default(cuid())
-  title        String
-  body         String
-  variables    Json
-  logging      Boolean        @default(false)
-  ownerId      String?
-  teamId       String?
-  createdById  String?
-  archivedAt   DateTime?
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  id          String    @id @default(cuid())
+  title       String
+  body        String
+  variables   Json
+  logging     Boolean   @default(false)
+  ownerId     String?
+  teamId      String?
+  createdById String?
+  archivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  owner     User?  @relation("PersonalOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  team      Team?  @relation("PromptTeam", fields: [teamId], references: [id], onDelete: SetNull)
-  createdBy User?  @relation("CreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  owner     User? @relation("PersonalOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  team      Team? @relation("PromptTeam", fields: [teamId], references: [id], onDelete: SetNull)
+  createdBy User? @relation("CreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
-  versions  PromptVersion[]
-  runLogs   RunLog[]
-  tags      TagOnPrompt[]
+  versions PromptVersion[]
+  runLogs  RunLog[]
+  tags     TagOnPrompt[]
 
-  @@check(ownerXorTeam, (ownerId IS NOT NULL) <> (teamId IS NOT NULL))
   @@index([ownerId, updatedAt])
   @@index([teamId, updatedAt])
 }
@@ -164,14 +163,11 @@ model Tag {
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
   prompts   TagOnPrompt[]
-
-  @@check(nameIsLowercase, name = lower(name))
-  @@check(nameIsTrimmed, btrim(name) = name)
 }
 
 model TagOnPrompt {
-  promptId String
-  tagId    String
+  promptId  String
+  tagId     String
   createdAt DateTime @default(now())
 
   prompt Prompt @relation(fields: [promptId], references: [id], onDelete: Cascade)

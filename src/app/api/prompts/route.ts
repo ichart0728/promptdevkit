@@ -1,24 +1,29 @@
-import { auth } from '@/app/api/auth/[...nextauth]/route';
-import { prisma } from '@/lib/prisma';
+import { auth } from "@/app/api/auth/[...nextauth]/route";
+import { prisma } from "@/lib/prisma";
 import {
   formatValidationError,
   logValidationFailure,
   normalizeTagName,
   normalizeTags,
   promptCreationSchema,
-} from '@/lib/prompt-validation';
-import { Prisma } from '@prisma/client';
-import { NextResponse } from 'next/server';
+} from "@/lib/prompt-validation";
+import { Prisma } from "@prisma/client";
+import { NextResponse } from "next/server";
+import { getSessionOrDev } from "@/lib/session";
 
 export async function GET(req: Request) {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
+  // NOTE: 開発時のみコメントアウト。本番ではこっちを使う。
+  // const session = await auth();
+  // if (!session?.user) {
+  //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // }
+  // NOTE: 開発時のみ。
+  const session = await getSessionOrDev();
+  if (!session?.user)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { searchParams } = new URL(req.url);
-  const q = searchParams.get('q') ?? undefined;
-  const tag = searchParams.get('tag') ?? undefined;
+  const q = searchParams.get("q") ?? undefined;
+  const tag = searchParams.get("tag") ?? undefined;
   const normalizedTag = tag ? normalizeTagName(tag) : undefined;
 
   const filters: Prisma.PromptWhereInput[] = [
@@ -44,8 +49,8 @@ export async function GET(req: Request) {
   if (q) {
     filters.push({
       OR: [
-        { title: { contains: q, mode: 'insensitive' } },
-        { body: { contains: q, mode: 'insensitive' } },
+        { title: { contains: q, mode: "insensitive" } },
+        { body: { contains: q, mode: "insensitive" } },
       ],
     });
   }
@@ -64,7 +69,7 @@ export async function GET(req: Request) {
 
   const prompts = await prisma.prompt.findMany({
     where: { AND: filters },
-    orderBy: { updatedAt: 'desc' },
+    orderBy: { updatedAt: "desc" },
     include: {
       tags: { include: { tag: true } },
       team: true,
@@ -76,35 +81,42 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  // NOTE: 開発時のみコメントアウト。本番ではこっちを使う。
+  // const session = await auth();
+  // if (!session?.user) {
+  //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // }
+  // NOTE: 開発時のみ。
+  const session = await getSessionOrDev();
+  if (!session?.user)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   let payload: unknown;
   try {
     payload = await req.json();
   } catch (error) {
-    console.warn('[prompts:create] Invalid JSON payload', {
-      message: error instanceof Error ? error.message : 'Unknown error',
+    console.warn("[prompts:create] Invalid JSON payload", {
+      message: error instanceof Error ? error.message : "Unknown error",
     });
     return NextResponse.json(
-      { error: { fieldErrors: {}, formErrors: ['Invalid JSON body.'] } },
-      { status: 400 },
+      { error: { fieldErrors: {}, formErrors: ["Invalid JSON body."] } },
+      { status: 400 }
     );
   }
 
   const parsed = promptCreationSchema.safeParse(payload);
   if (!parsed.success) {
-    logValidationFailure('prompts:create', parsed.error);
-    return NextResponse.json(formatValidationError(parsed.error), { status: 400 });
+    logValidationFailure("prompts:create", parsed.error);
+    return NextResponse.json(formatValidationError(parsed.error), {
+      status: 400,
+    });
   }
 
   const data = parsed.data;
   const variables = data.variables ?? {};
   const normalizedTags = normalizeTags(data.tags);
   const logging = data.logging ?? false;
-  const teamId = typeof data.teamId === 'string' ? data.teamId : undefined;
+  const teamId = typeof data.teamId === "string" ? data.teamId : undefined;
 
   const isTeamPrompt = Boolean(teamId);
 
@@ -117,7 +129,7 @@ export async function POST(req: Request) {
     });
 
     if (!membership) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
   }
 
