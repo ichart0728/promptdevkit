@@ -1,4 +1,4 @@
-import { PromptWithTags } from "@/types/prompt";
+import { PromptVersion, PromptWithTags } from "@/types/prompt";
 
 type FetchError = Error & { status?: number };
 
@@ -15,7 +15,7 @@ const buildError = async (res: Response): Promise<FetchError> => {
         message = data.error.formErrors.join("\n");
       }
     }
-  } catch (error) {
+  } catch {
     // ignore parsing errors
   }
   const err = new Error(message) as FetchError;
@@ -59,4 +59,46 @@ export async function createPrompt(payload: CreatePromptPayload): Promise<Prompt
     throw await buildError(res);
   }
   return res.json();
+}
+
+type UpdatePromptPayload = {
+  title: string;
+  body: string;
+  tags?: string[];
+};
+
+export async function updatePrompt(id: string, payload: UpdatePromptPayload): Promise<PromptWithTags> {
+  const res = await fetch(`/api/prompts/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    throw await buildError(res);
+  }
+  return res.json();
+}
+
+export async function deletePrompt(id: string): Promise<void> {
+  const res = await fetch(`/api/prompts/${id}`, { method: "DELETE" });
+  if (!res.ok) {
+    throw await buildError(res);
+  }
+}
+
+export async function getPromptVersions(promptId: string): Promise<PromptVersion[]> {
+  const res = await fetch(`/api/prompts/${promptId}/versions`, { method: "GET" });
+  if (!res.ok) {
+    throw await buildError(res);
+  }
+  return res.json();
+}
+
+export async function deletePromptVersion(promptId: string, versionId: string): Promise<void> {
+  const res = await fetch(`/api/prompts/${promptId}/versions/${versionId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    throw await buildError(res);
+  }
 }

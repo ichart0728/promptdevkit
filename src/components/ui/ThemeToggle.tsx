@@ -23,24 +23,25 @@ const applyTheme = (theme: Theme) => {
 };
 
 export function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>(() => {
-    if (typeof window === "undefined") return "light";
-    return getPreferredTheme();
-  });
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    applyTheme(theme);
-    window.localStorage.setItem(STORAGE_KEY, theme);
-  }, [theme]);
+  const [theme, setTheme] = useState<Theme>("light");
+  const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     const stored = getPreferredTheme();
+    applyTheme(stored);
     setTheme(stored);
+    setIsInitialized(true);
   }, []);
 
+  useEffect(() => {
+    if (!isInitialized || typeof window === "undefined") return;
+    applyTheme(theme);
+    window.localStorage.setItem(STORAGE_KEY, theme);
+  }, [theme, isInitialized]);
+
   const toggleTheme = () => {
+    if (!isInitialized) return;
     setTheme((current) => (current === "dark" ? "light" : "dark"));
   };
 
@@ -48,7 +49,8 @@ export function ThemeToggle() {
     <button
       type="button"
       onClick={toggleTheme}
-      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-300 bg-white/70 text-lg text-slate-600 shadow-sm transition hover:border-violet-300 hover:text-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-400/60 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:border-violet-500 dark:hover:text-violet-300 dark:focus:ring-violet-500/60"
+      disabled={!isInitialized}
+      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-300 bg-white/70 text-lg text-slate-600 shadow-sm transition hover:border-violet-300 hover:text-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-400/60 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:border-violet-500 dark:hover:text-violet-300 dark:focus:ring-violet-500/60"
       aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
     >
       {theme === "dark" ? "🌙" : "☀️"}

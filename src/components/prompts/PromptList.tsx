@@ -20,6 +20,8 @@ type PromptListProps = {
   onTagChange: (tags: string[]) => void;
   onRetry: () => void;
   onAddPrompt: () => void;
+  onPromptUpdated: (prompt: PromptWithTags) => void | Promise<void>;
+  onPromptDeleted: (promptId: string) => void | Promise<void>;
 };
 
 export function PromptList({
@@ -34,6 +36,8 @@ export function PromptList({
   onTagChange,
   onRetry,
   onAddPrompt,
+  onPromptUpdated,
+  onPromptDeleted,
 }: PromptListProps) {
   return (
     <section className="flex flex-col gap-6">
@@ -76,7 +80,14 @@ export function PromptList({
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
           {loading && prompts.length === 0
             ? Array.from({ length: 6 }).map((_, index) => <SkeletonCard key={`skeleton-${index}`} />)
-            : prompts.map((prompt) => <PromptCard key={prompt.id} prompt={prompt} />)}
+            : prompts.map((prompt) => (
+                <PromptCard
+                  key={prompt.id}
+                  prompt={prompt}
+                  onUpdated={onPromptUpdated}
+                  onDeleted={onPromptDeleted}
+                />
+              ))}
           {loading && prompts.length > 0
             ? Array.from({ length: 3 }).map((_, index) => <SkeletonCard key={`loading-${index}`} />)
             : null}

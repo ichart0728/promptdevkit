@@ -12,3 +12,13 @@ export type Prompt = {
   updatedAt: string;
 };
 export type PromptWithTags = Prompt & { tags: TagOnPrompt[] };
+
+export type PromptVersion = {
+  id: string;
+  promptId: string;
+  version: number;
+  title: string;
+  body: string;
+  variables: Record<string, unknown> | null;
+  createdAt: string;
+};

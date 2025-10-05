@@ -9,6 +9,9 @@ import { getPrompts } from "@/lib/api";
 import { normalizeTag } from "@/lib/tag";
 import { PromptWithTags } from "@/types/prompt";
 
+const sortByUpdated = (items: PromptWithTags[]) =>
+  [...items].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+
 const sortTags = (values: string[]) => [...values].sort((a, b) => a.localeCompare(b));
 
 const arraysEqual = (a: string[], b: string[]) => {
@@ -64,6 +67,17 @@ export default function DashboardPage() {
 
   const requestRef = useRef(0);
 
+  const buildAvailableTags = useCallback((items: PromptWithTags[], baseTags: string[] = []) => {
+    const tagSet = new Set(baseTags);
+    items.forEach((item) => {
+      item.tags.forEach(({ tag }) => {
+        const normalized = normalizeTag(tag.name);
+        if (normalized) tagSet.add(normalized);
+      });
+    });
+    return Array.from(tagSet).sort((a, b) => a.localeCompare(b));
+  }, []);
+
   useEffect(() => {
     const handle = window.setTimeout(() => {
       setDebouncedTags(selectedTags);
@@ -89,18 +103,9 @@ export default function DashboardPage() {
       try {
         const data = await getPrompts(query || undefined, tags);
         if (requestId !== requestRef.current) return;
-        const sorted = [...data].sort(
-          (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-        );
+        const sorted = sortByUpdated(data);
         setPrompts(sorted);
-        const tagSet = new Set(tags);
-        sorted.forEach((prompt) => {
-          prompt.tags.forEach(({ tag }) => {
-            const normalized = normalizeTag(tag.name);
-            if (normalized) tagSet.add(normalized);
-          });
-        });
-        setAvailableTags(Array.from(tagSet).sort((a, b) => a.localeCompare(b)));
+        setAvailableTags(buildAvailableTags(sorted, tags));
       } catch (err) {
         if (requestId !== requestRef.current) return;
         setError(err instanceof Error ? err.message : "Failed to load prompts.");
@@ -110,7 +115,7 @@ export default function DashboardPage() {
         }
       }
     },
-    []
+    [buildAvailableTags]
   );
 
   useEffect(() => {
@@ -137,22 +142,40 @@ export default function DashboardPage() {
     (prompt: PromptWithTags) => {
       setPrompts((current) => {
         const filtered = current.filter((item) => item.id !== prompt.id);
-        if (!promptMatchesFilters(prompt, searchTerm, debouncedTags)) {
-          return filtered;
-        }
-        return [prompt, ...filtered];
-      });
-      setAvailableTags((current) => {
-        const tagSet = new Set(current);
-        prompt.tags.forEach(({ tag }) => {
-          const normalized = normalizeTag(tag.name);
-          if (normalized) tagSet.add(normalized);
-        });
-        return Array.from(tagSet).sort((a, b) => a.localeCompare(b));
+        const next = promptMatchesFilters(prompt, searchTerm, debouncedTags)
+          ? sortByUpdated([prompt, ...filtered])
+          : sortByUpdated(filtered);
+        setAvailableTags(buildAvailableTags(next, debouncedTags));
+        return next;
       });
       setError(null);
     },
-    [debouncedTags, searchTerm]
+    [debouncedTags, searchTerm, buildAvailableTags]
+  );
+
+  const handlePromptUpdated = useCallback(
+    (updated: PromptWithTags) => {
+      setPrompts((current) => {
+        const filtered = current.filter((item) => item.id !== updated.id);
+        const next = promptMatchesFilters(updated, searchTerm, debouncedTags)
+          ? sortByUpdated([updated, ...filtered])
+          : sortByUpdated(filtered);
+        setAvailableTags(buildAvailableTags(next, debouncedTags));
+        return next;
+      });
+    },
+    [debouncedTags, searchTerm, buildAvailableTags]
+  );
+
+  const handlePromptDeleted = useCallback(
+    (promptId: string) => {
+      setPrompts((current) => {
+        const next = sortByUpdated(current.filter((item) => item.id !== promptId));
+        setAvailableTags(buildAvailableTags(next, debouncedTags));
+        return next;
+      });
+    },
+    [debouncedTags, buildAvailableTags]
   );
 
   const handleAddPrompt = () => {
@@ -180,6 +203,8 @@ export default function DashboardPage() {
           onTagChange={setSelectedTags}
           onRetry={handleRetry}
           onAddPrompt={handleAddPrompt}
+          onPromptUpdated={handlePromptUpdated}
+          onPromptDeleted={handlePromptDeleted}
         />
       </div>
       <CreatePromptDialog
