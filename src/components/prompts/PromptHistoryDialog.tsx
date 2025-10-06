@@ -6,6 +6,7 @@ import type { UIEvent } from "react";
 import { deletePromptVersion, getPromptVersions } from "@/lib/api";
 import { formatUpdatedAt } from "@/lib/format";
 import { PromptVersion, PromptWithTags } from "@/types/prompt";
+import { ThemeToggle, SunIcon, MoonIcon } from "@/components/ui/ThemeToggle";
 
 const focusableSelector =
   "a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex='-1'])";
@@ -313,9 +314,10 @@ export function PromptHistoryDialog({
     return (
       <div
         key={key}
-        className={`flex gap-2 whitespace-pre-wrap overflow-x-hidden border px-3 py-1 font-mono text-xs leading-[24px] shadow-sm transition dark:border-transparent ${
+        className={`flex gap-2 min-w-0 max-w-full whitespace-pre-wrap border px-3 py-1 font-mono text-xs leading-[24px] shadow-sm transition dark:border-transparent ${
           classes[row.type]
         }`}
+        style={{ overflowWrap: "anywhere", wordBreak: "break-word" }}
       >
         <span className="select-none text-xs font-semibold text-slate-400 dark:text-slate-500">
           {marker}
@@ -376,26 +378,33 @@ export function PromptHistoryDialog({
         aria-labelledby="prompt-history-heading"
         className="flex h-[80vh] w-full max-w-6xl flex-col gap-4 overflow-hidden rounded-2xl border border-violet-200 bg-white p-6 shadow-2xl shadow-violet-500/20 transition dark:border-violet-500/40 dark:bg-slate-900"
       >
-        <header className="flex items-start justify-between gap-3">
-          <div className="flex flex-col gap-1">
-            <h2
-              id="prompt-history-heading"
-              className="text-xl font-semibold text-slate-900 dark:text-slate-100"
-            >
-              Prompt history
-            </h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Compare past versions of this prompt and review previous edits.
-            </p>
+        <header className="flex flex-col gap-2">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-slate-500 dark:text-slate-300">
+              <SunIcon className="h-4 w-4" />
+              <ThemeToggle />
+              <MoonIcon className="h-4 w-4" />
+            </div>
+            <div className="flex items-center gap-2">
+              <h2
+                id="prompt-history-heading"
+                className="text-right text-xl font-semibold text-slate-900 dark:text-slate-100"
+              >
+                Prompt history
+              </h2>
+              <button
+                type="button"
+                onClick={() => onOpenChange(false)}
+                className="rounded-full border border-transparent p-2 text-slate-500 transition hover:border-slate-300 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-400/60 dark:text-slate-400 dark:hover:border-slate-700 dark:hover:text-slate-200 dark:focus:ring-violet-500/60"
+                aria-label="Close history dialog"
+              >
+                ✕
+              </button>
+            </div>
           </div>
-          <button
-            type="button"
-            onClick={() => onOpenChange(false)}
-            className="rounded-full border border-transparent p-2 text-slate-500 transition hover:border-slate-300 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-400/60 dark:text-slate-400 dark:hover:border-slate-700 dark:hover:text-slate-200 dark:focus:ring-violet-500/60"
-            aria-label="Close history dialog"
-          >
-            ✕
-          </button>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Compare past versions of this prompt and review previous edits.
+          </p>
         </header>
 
         {error ? (
@@ -501,7 +510,7 @@ export function PromptHistoryDialog({
                   <div
                     ref={syncPanelRef}
                     onScroll={handleSharedScroll}
-                    className="min-h-0 flex-1 overflow-y-auto"
+                    className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden"
                     style={{ scrollbarGutter: "stable" }}
                   >
                     {loading ? (

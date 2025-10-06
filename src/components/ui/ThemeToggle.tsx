@@ -17,12 +17,55 @@ const applyTheme = (theme: Theme) => {
   const root = document.documentElement;
   if (theme === "dark") {
     root.classList.add("dark");
+    root.classList.remove("light");
   } else {
     root.classList.remove("dark");
+    root.classList.add("light");
   }
+  root.dataset.theme = theme;
 };
 
-export function ThemeToggle() {
+export const SunIcon = ({ className }: { className?: string }) => (
+  <svg
+    className={className}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <circle cx="12" cy="12" r="4" />
+    <path d="M12 2v2" />
+    <path d="M12 20v2" />
+    <path d="m4.93 4.93 1.42 1.42" />
+    <path d="m17.65 17.65 1.42 1.42" />
+    <path d="M2 12h2" />
+    <path d="M20 12h2" />
+    <path d="m6.35 17.65-1.42 1.42" />
+    <path d="m19.07 4.93-1.42 1.42" />
+  </svg>
+);
+
+export const MoonIcon = ({ className }: { className?: string }) => (
+  <svg
+    className={className}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+  </svg>
+);
+
+type ThemeToggleProps = {
+  className?: string;
+};
+
+export function ThemeToggle({ className }: ThemeToggleProps) {
   const [theme, setTheme] = useState<Theme>("light");
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -50,10 +93,17 @@ export function ThemeToggle() {
       type="button"
       onClick={toggleTheme}
       disabled={!isInitialized}
-      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-300 bg-white/70 text-lg text-slate-600 shadow-sm transition hover:border-violet-300 hover:text-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-400/60 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:border-violet-500 dark:hover:text-violet-300 dark:focus:ring-violet-500/60"
+      aria-pressed={theme === "dark"}
       aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+      className={`relative inline-flex h-7 w-12 items-center rounded-full border border-violet-300 bg-white/80 px-1 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-violet-400/60 disabled:cursor-not-allowed disabled:opacity-60 dark:border-violet-500/50 dark:bg-slate-900/80 ${
+        className ?? ""
+      }`}
     >
-      {theme === "dark" ? "🌙" : "☀️"}
+      <span
+        className={`pointer-events-none absolute inset-y-1 w-5 rounded-full bg-violet-500/80 shadow transition-transform dark:bg-violet-400/80 ${
+          theme === "dark" ? "translate-x-6" : "translate-x-1"
+        }`}
+      />
     </button>
   );
 }
