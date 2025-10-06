@@ -12,11 +12,12 @@ type CreatePromptDialogProps = {
 };
 
 export function CreatePromptDialog({ open, onOpenChange, onCreated }: CreatePromptDialogProps) {
-  const handleSubmit = async ({ title, body, tags }: PromptFormValues) => {
+  const handleSubmit = async ({ title, body, tags, notes }: PromptFormValues) => {
     const prompt = await createPrompt({
       title,
       body,
       tags: tags.length ? tags : undefined,
+      notes,
     });
     await onCreated(prompt);
   };

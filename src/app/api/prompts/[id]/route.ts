@@ -89,10 +89,12 @@ export async function PATCH(req: Request, { params }: Params) {
   const data = parsed.data;
   const normalizedTags = normalizeTags(data.tags);
   const currentTags = prompt.tags.map(({ tag }) => tag.name);
+  const notes = typeof data.notes === "string" && data.notes.trim() ? data.notes.trim() : null;
 
   const hasChanges =
     prompt.title !== data.title ||
     prompt.body !== data.body ||
+    (prompt.notes ?? null) !== notes ||
     !arraysEqual(currentTags, normalizedTags);
 
   if (!hasChanges) {
@@ -129,6 +131,7 @@ export async function PATCH(req: Request, { params }: Params) {
         body: data.body,
         variables: data.variables ?? prompt.variables,
         logging: typeof data.logging === "boolean" ? data.logging : prompt.logging,
+        notes,
         tags: {
           deleteMany: tagIdsToRemove.length ? { tagId: { in: tagIdsToRemove } } : undefined,
           create: tagsToAdd.map((name) => ({

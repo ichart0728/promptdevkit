@@ -35,7 +35,7 @@ export default function RootLayout({
             </div>
             <div className="flex items-center gap-2 text-slate-500 dark:text-slate-300">
               <SunIcon className="h-4 w-4" />
-              <ThemeToggle />
+              <ThemeToggle className="h-6 w-10" />
               <MoonIcon className="h-4 w-4" />
             </div>
           </header>

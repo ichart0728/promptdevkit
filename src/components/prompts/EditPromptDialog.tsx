@@ -21,14 +21,16 @@ export function EditPromptDialog({ prompt, open, onOpenChange, onUpdated }: Edit
       title: prompt.title,
       body: prompt.body,
       tags: prompt.tags.map(({ tag }) => normalizeTag(tag.name)).filter(Boolean),
+      notes: prompt.notes ?? "",
     } satisfies PromptFormValues;
   }, [prompt]);
 
-  const handleSubmit = async ({ title, body, tags }: PromptFormValues) => {
+  const handleSubmit = async ({ title, body, tags, notes }: PromptFormValues) => {
     const updated = await updatePrompt(prompt.id, {
       title,
       body,
       tags: tags.length ? tags : undefined,
+      notes,
     });
     await onUpdated(updated);
   };

@@ -7,6 +7,7 @@ const PROMPT_VARIABLE_KEY_MAX_LENGTH = 1000;
 const PROMPT_VARIABLE_VALUE_MAX_LENGTH = 1000;
 const PROMPT_TAG_MAX = 10;
 const PROMPT_TAG_MAX_LENGTH = 32;
+const PROMPT_NOTES_MAX_LENGTH = 4000;
 
 const variableKeySchema = z
   .string()
@@ -56,6 +57,15 @@ export const promptCreationSchema = z
     tags: z.array(tagInputSchema).max(PROMPT_TAG_MAX, `Provide ${PROMPT_TAG_MAX} tags or fewer.`).optional(),
     logging: z.boolean().optional(),
     teamId: z.string().trim().min(1).optional().nullable(),
+    notes: z
+      .string()
+      .max(
+        PROMPT_NOTES_MAX_LENGTH,
+        `Notes must be ${PROMPT_NOTES_MAX_LENGTH} characters or fewer.`,
+      )
+      .optional()
+      .transform((value) => value?.trim())
+      .nullable(),
   })
   .strict();
 

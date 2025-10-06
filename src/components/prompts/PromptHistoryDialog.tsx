@@ -6,7 +6,6 @@ import type { UIEvent } from "react";
 import { deletePromptVersion, getPromptVersions } from "@/lib/api";
 import { formatUpdatedAt } from "@/lib/format";
 import { PromptVersion, PromptWithTags } from "@/types/prompt";
-import { ThemeToggle, SunIcon, MoonIcon } from "@/components/ui/ThemeToggle";
 
 const focusableSelector =
   "a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex='-1'])";
@@ -380,11 +379,6 @@ export function PromptHistoryDialog({
       >
         <header className="flex flex-col gap-2">
           <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-slate-500 dark:text-slate-300">
-              <SunIcon className="h-4 w-4" />
-              <ThemeToggle />
-              <MoonIcon className="h-4 w-4" />
-            </div>
             <div className="flex items-center gap-2">
               <h2
                 id="prompt-history-heading"

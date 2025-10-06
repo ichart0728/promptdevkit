@@ -28,7 +28,7 @@ const promptMatchesFilters = (
 ): boolean => {
   const normalizedQuery = query.trim().toLowerCase();
   if (normalizedQuery) {
-    const haystack = `${prompt.title} ${prompt.body}`.toLowerCase();
+    const haystack = `${prompt.title} ${prompt.body} ${prompt.notes ?? ""}`.toLowerCase();
     if (!haystack.includes(normalizedQuery)) {
       return false;
     }

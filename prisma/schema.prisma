@@ -23,21 +23,22 @@ enum TeamRole {
 }
 
 model User {
-  id              String       @id @default(cuid())
+  id              String          @id @default(cuid())
   name            String?
-  email           String?      @unique
+  email           String?         @unique
   emailVerified   DateTime?
   image           String?
   deletedAt       DateTime?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
   accounts        Account[]
   sessions        Session[]
-  personalPrompts Prompt[]     @relation("PersonalOwner")
-  createdPrompts  Prompt[]     @relation("CreatedBy")
+  personalPrompts Prompt[]        @relation("PersonalOwner")
+  createdPrompts  Prompt[]        @relation("CreatedBy")
   teamMemberships TeamMember[]
-  ownedTeams      Team[]       @relation("TeamOwner")
+  ownedTeams      Team[]          @relation("TeamOwner")
   runLogs         RunLog[]
+  PromptComment   PromptComment[]
 }
 
 model Account {
@@ -115,6 +116,7 @@ model Prompt {
   archivedAt  DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+  notes       String?
 
   owner     User? @relation("PersonalOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   team      Team? @relation("PromptTeam", fields: [teamId], references: [id], onDelete: SetNull)
@@ -123,6 +125,7 @@ model Prompt {
   versions PromptVersion[]
   runLogs  RunLog[]
   tags     TagOnPrompt[]
+  comments PromptComment[]
 
   @@index([ownerId, updatedAt])
   @@index([teamId, updatedAt])
@@ -174,4 +177,22 @@ model TagOnPrompt {
   tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@id([promptId, tagId])
+}
+
+model PromptComment {
+  id        String   @id @default(cuid())
+  promptId  String
+  authorId  String?
+  parentId  String?
+  body      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  prompt  Prompt          @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  author  User?           @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  parent  PromptComment?  @relation("PromptCommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies PromptComment[] @relation("PromptCommentReplies")
+
+  @@index([promptId, createdAt])
+  @@index([parentId, createdAt])
 }

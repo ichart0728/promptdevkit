@@ -1,4 +1,4 @@
-import { PromptVersion, PromptWithTags } from "@/types/prompt";
+import { PromptComment, PromptVersion, PromptWithTags } from "@/types/prompt";
 
 type FetchError = Error & { status?: number };
 
@@ -47,6 +47,7 @@ type CreatePromptPayload = {
   title: string;
   body: string;
   tags?: string[];
+  notes?: string;
 };
 
 export async function createPrompt(payload: CreatePromptPayload): Promise<PromptWithTags> {
@@ -65,6 +66,7 @@ type UpdatePromptPayload = {
   title: string;
   body: string;
   tags?: string[];
+  notes?: string;
 };
 
 export async function updatePrompt(id: string, payload: UpdatePromptPayload): Promise<PromptWithTags> {
@@ -101,4 +103,32 @@ export async function deletePromptVersion(promptId: string, versionId: string): 
   if (!res.ok) {
     throw await buildError(res);
   }
+}
+
+type CreatePromptCommentPayload = {
+  body: string;
+  parentId?: string | null;
+};
+
+export async function getPromptComments(promptId: string): Promise<PromptComment[]> {
+  const res = await fetch(`/api/prompts/${promptId}/comments`, { method: "GET" });
+  if (!res.ok) {
+    throw await buildError(res);
+  }
+  return res.json();
+}
+
+export async function createPromptComment(
+  promptId: string,
+  payload: CreatePromptCommentPayload
+): Promise<PromptComment> {
+  const res = await fetch(`/api/prompts/${promptId}/comments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    throw await buildError(res);
+  }
+  return res.json();
 }

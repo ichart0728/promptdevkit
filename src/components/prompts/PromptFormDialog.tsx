@@ -4,10 +4,11 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { normalizeTag, normalizeTags as normalizeTagList } from "@/lib/tag";
 
-type PromptFormValues = {
+export type PromptFormValues = {
   title: string;
   body: string;
   tags: string[];
+  notes?: string;
 };
 
 type PromptFormDialogProps = {
@@ -26,6 +27,7 @@ type Errors = {
   title?: string;
   body?: string;
   tags?: string;
+  notes?: string;
   form?: string;
 };
 
@@ -41,6 +43,7 @@ const defaultValues: PromptFormValues = {
   title: "",
   body: "",
   tags: [],
+  notes: "",
 };
 
 export function PromptFormDialog({
@@ -56,13 +59,14 @@ export function PromptFormDialog({
 }: PromptFormDialogProps) {
   const values = initialValues ?? defaultValues;
   const initialSnapshot = useMemo(
-    () => ({ title: values.title, body: values.body, tags: values.tags }),
-    [values.title, values.body, values.tags]
+    () => ({ title: values.title, body: values.body, tags: values.tags, notes: values.notes ?? "" }),
+    [values.title, values.body, values.tags, values.notes]
   );
 
   const [title, setTitle] = useState(values.title);
   const [body, setBody] = useState(values.body);
   const [tags, setTags] = useState<string[]>(values.tags);
+  const [notes, setNotes] = useState(values.notes ?? "");
   const [tagInput, setTagInput] = useState("");
   const [errors, setErrors] = useState<Errors>({});
   const [submitting, setSubmitting] = useState(false);
@@ -76,6 +80,7 @@ export function PromptFormDialog({
       setTitle(initialSnapshot.title);
       setBody(initialSnapshot.body);
       setTags(initialSnapshot.tags);
+      setNotes(initialSnapshot.notes ?? "");
       setTagInput("");
       setErrors({});
       setSubmitting(false);
@@ -86,6 +91,7 @@ export function PromptFormDialog({
     setTitle(initialSnapshot.title);
     setBody(initialSnapshot.body);
     setTags(initialSnapshot.tags);
+    setNotes(initialSnapshot.notes ?? "");
     setTagInput("");
 
     const focusInitialField = () => {
@@ -170,6 +176,7 @@ export function PromptFormDialog({
     const nextErrors: Errors = {};
     const trimmedTitle = title.trim();
     const trimmedBody = body.trim();
+    const trimmedNotes = notes.trim();
 
     if (!trimmedTitle) {
       nextErrors.title = "Title is required.";
@@ -191,6 +198,10 @@ export function PromptFormDialog({
       nextErrors.tags = "Tags must be 32 characters or fewer.";
     }
 
+    if (trimmedNotes.length > 4000) {
+      nextErrors.notes = "Notes must be 4000 characters or fewer.";
+    }
+
     setErrors(nextErrors);
     return nextErrors;
   };
@@ -202,13 +213,19 @@ export function PromptFormDialog({
 
     const trimmedTitle = title.trim();
     const trimmedBody = body.trim();
+    const trimmedNotes = notes.trim();
     const normalizedTags = tags.length ? normalizeTagList(tags) : [];
 
     setSubmitting(true);
     setErrors({});
 
     try {
-      await onSubmit({ title: trimmedTitle, body: trimmedBody, tags: normalizedTags });
+      await onSubmit({
+        title: trimmedTitle,
+        body: trimmedBody,
+        tags: normalizedTags,
+        notes: trimmedNotes ? trimmedNotes : undefined,
+      });
       onOpenChange(false);
     } catch (error) {
       setErrors({
@@ -303,6 +320,25 @@ export function PromptFormDialog({
                   {errors.body}
                 </span>
               ) : null}
+            </label>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Notes</span>
+              <textarea
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                rows={4}
+                maxLength={4000}
+                className="rounded-xl border border-slate-300 bg-white/80 px-4 py-2 text-sm text-slate-900 shadow-inner transition focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-400/60 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-100 dark:focus:border-violet-500 dark:focus:ring-violet-500/60"
+                aria-invalid={errors.notes ? "true" : undefined}
+                placeholder="Add internal notes or context (optional)"
+              />
+              <div className="flex items-center justify-between text-xs">
+                <span className={errors.notes ? "text-red-500" : "text-slate-400 dark:text-slate-500"}>
+                  {errors.notes ?? "Visible to collaborators only."}
+                </span>
+                <span className="text-slate-400 dark:text-slate-500">{`${notes.length}/4000`}</span>
+              </div>
             </label>
 
             <div className="flex flex-col gap-2">

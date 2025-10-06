@@ -10,8 +10,22 @@ export type Prompt = {
   teamId?: string | null;
   createdAt: string;
   updatedAt: string;
+  notes?: string | null;
 };
 export type PromptWithTags = Prompt & { tags: TagOnPrompt[] };
+
+export type PromptComment = {
+  id: string;
+  promptId: string;
+  authorId?: string | null;
+  authorName?: string | null;
+  authorEmail?: string | null;
+  parentId?: string | null;
+  body: string;
+  createdAt: string;
+  updatedAt: string;
+  replies: PromptComment[];
+};
 
 export type PromptVersion = {
   id: string;

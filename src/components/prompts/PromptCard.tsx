@@ -9,6 +9,7 @@ import { PromptWithTags } from "@/types/prompt";
 import { DeletePromptDialog } from "./DeletePromptDialog";
 import { EditPromptDialog } from "./EditPromptDialog";
 import { PromptHistoryDialog } from "./PromptHistoryDialog";
+import { PromptCommentsDialog } from "./PromptCommentsDialog";
 
 type PromptCardProps = {
   prompt: PromptWithTags;
@@ -23,18 +24,27 @@ const snippetStyle = {
   overflow: "hidden",
 };
 
+const notesStyle = {
+  display: "-webkit-box",
+  WebkitBoxOrient: "vertical" as const,
+  WebkitLineClamp: 3,
+  overflow: "hidden",
+};
+
 export function PromptCard({ prompt, onUpdated, onDeleted }: PromptCardProps) {
   const [promptData, setPromptData] = useState<PromptWithTags>(prompt);
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
 
   useEffect(() => {
     setPromptData(prompt);
   }, [prompt]);
 
   const tags = promptData.tags.map(({ tag }) => tag.name.toLowerCase());
+  const notesSnippet = promptData.notes ? formatSnippet(promptData.notes, 200) : "";
 
   const handleCopy = async () => {
     try {
@@ -70,6 +80,46 @@ export function PromptCard({ prompt, onUpdated, onDeleted }: PromptCardProps) {
     await onDeleted(promptData.id);
   };
 
+  const CopyIcon = () => (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="9" y="9" width="13" height="13" rx="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  );
+
+  const HistoryIcon = () => (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 8v5l3 2" />
+      <path d="M3 12a9 9 0 1 0 9-9" />
+      <path d="M3 4.5V9h4.5" />
+    </svg>
+  );
+
+  const CommentIcon = () => (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M7 8h10" />
+      <path d="M7 12h6" />
+      <path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2Z" />
+    </svg>
+  );
+
+  const EditIcon = () => (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3l-11 11L7 18l.5-1.5 11-11Z" />
+    </svg>
+  );
+
+  const TrashIcon = () => (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 6h18" />
+      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+      <path d="M10 11v6" />
+      <path d="M14 11v6" />
+    </svg>
+  );
+
   return (
     <>
       <article
@@ -78,7 +128,7 @@ export function PromptCard({ prompt, onUpdated, onDeleted }: PromptCardProps) {
       >
         <div className="flex flex-col gap-3">
           <header className="flex items-start justify-between gap-3">
-            <div className="flex flex-col gap-1">
+            <div className="min-w-0 flex flex-col gap-1">
               <h3 className="text-lg font-semibold text-slate-900 transition-colors dark:text-slate-100">
                 {promptData.title}
               </h3>
@@ -89,38 +139,51 @@ export function PromptCard({ prompt, onUpdated, onDeleted }: PromptCardProps) {
                 {formatUpdatedAt(promptData.updatedAt)}
               </time>
             </div>
-            <div className="flex items-center gap-2 text-sm">
+            <div className="flex flex-wrap items-center justify-end gap-2">
               <button
                 type="button"
                 onClick={handleCopy}
-                className="rounded-full border border-slate-200 bg-white/70 px-3 py-1 text-xs font-medium text-slate-600 transition hover:border-violet-300 hover:text-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-400/60 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:border-violet-500 dark:hover:text-violet-300 dark:focus:ring-violet-500/60"
-                aria-label="Copy prompt body"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white/70 text-slate-600 transition hover:border-violet-300 hover:text-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-400/60 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:border-violet-500 dark:hover:text-violet-300 dark:focus:ring-violet-500/60"
+                aria-label={copyState === "copied" ? "Copied" : "Copy prompt body"}
               >
-                {copyState === "copied" ? "Copied" : copyState === "error" ? "Retry" : "Copy"}
+                <CopyIcon />
+                <span className="sr-only">{copyState === "copied" ? "Copied" : copyState === "error" ? "Retry copy" : "Copy"}</span>
               </button>
               <button
                 type="button"
                 onClick={() => setHistoryOpen(true)}
-                className="rounded-full border border-slate-200 bg-white/70 px-3 py-1 text-xs font-medium text-slate-600 transition hover:border-violet-300 hover:text-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-400/60 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:border-violet-500 dark:hover:text-violet-300 dark:focus:ring-violet-500/60"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white/70 text-slate-600 transition hover:border-violet-300 hover:text-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-400/60 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:border-violet-500 dark:hover:text-violet-300 dark:focus:ring-violet-500/60"
                 aria-label="View prompt history"
               >
-                History
+                <HistoryIcon />
+                <span className="sr-only">History</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setCommentsOpen(true)}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white/70 text-slate-600 transition hover:border-violet-300 hover:text-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-400/60 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:border-violet-500 dark:hover:text-violet-300 dark:focus:ring-violet-500/60"
+                aria-label="View comments"
+              >
+                <CommentIcon />
+                <span className="sr-only">Comments</span>
               </button>
               <button
                 type="button"
                 onClick={() => setEditOpen(true)}
-                className="rounded-full border border-slate-200 bg-white/70 px-3 py-1 text-xs font-medium text-slate-600 transition hover:border-violet-300 hover:text-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-400/60 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:border-violet-500 dark:hover:text-violet-300 dark:focus:ring-violet-500/60"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white/70 text-slate-600 transition hover:border-violet-300 hover:text-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-400/60 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300 dark:hover-border-violet-500 dark:hover:text-violet-300 dark:focus:ring-violet-500/60"
                 aria-label="Edit prompt"
               >
-                Edit
+                <EditIcon />
+                <span className="sr-only">Edit</span>
               </button>
               <button
                 type="button"
                 onClick={() => setDeleteOpen(true)}
-                className="rounded-full border border-red-200 bg-white/70 px-3 py-1 text-xs font-medium text-red-600 transition hover:border-red-300 hover:text-red-500 focus:outline-none focus:ring-2 focus:ring-red-400/60 dark:border-red-500/40 dark:bg-slate-900/60 dark:text-red-300 dark:hover:border-red-500 dark:hover:text-red-200 dark:focus:ring-red-500/60"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-red-200 bg-white/70 text-red-600 transition hover:border-red-300 hover:text-red-500 focus:outline-none focus:ring-2 focus:ring-red-400/60 dark:border-red-500/40 dark:bg-slate-900/60 dark:text-red-300 dark:hover:border-red-500 dark:hover:text-red-200 dark:focus:ring-red-500/60"
                 aria-label="Delete prompt"
               >
-                Delete
+                <TrashIcon />
+                <span className="sr-only">Delete</span>
               </button>
             </div>
           </header>
@@ -130,6 +193,14 @@ export function PromptCard({ prompt, onUpdated, onDeleted }: PromptCardProps) {
           >
             {formatSnippet(promptData.body)}
           </p>
+          {notesSnippet ? (
+            <div
+              className="rounded-xl bg-slate-100/70 p-3 text-xs text-slate-600 transition-colors dark:bg-slate-800/60 dark:text-slate-300"
+              style={notesStyle}
+            >
+              {notesSnippet}
+            </div>
+          ) : null}
         </div>
         {tags.length ? (
           <footer className="mt-4 flex flex-wrap gap-2">
@@ -158,6 +229,11 @@ export function PromptCard({ prompt, onUpdated, onDeleted }: PromptCardProps) {
         onConfirm={handleConfirmDelete}
       />
       <PromptHistoryDialog prompt={promptData} open={historyOpen} onOpenChange={setHistoryOpen} />
+      <PromptCommentsDialog
+        prompt={promptData}
+        open={commentsOpen}
+        onOpenChange={setCommentsOpen}
+      />
     </>
   );
 }
