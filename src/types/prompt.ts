@@ -12,7 +12,7 @@ export type Prompt = {
   updatedAt: string;
   notes?: string | null;
 };
-export type PromptWithTags = Prompt & { tags: TagOnPrompt[] };
+export type PromptWithTags = Prompt & { tags: TagOnPrompt[]; commentCount?: number };
 
 export type PromptComment = {
   id: string;

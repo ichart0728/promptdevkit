@@ -19,6 +19,7 @@ type PromptCommentsDialogProps = {
   prompt: PromptWithTags;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onCommentCountChange?: (count: number) => void;
 };
 
 type NewCommentState = {
@@ -50,7 +51,12 @@ const flattenComments = (nodes: PromptComment[]): PromptComment[] => {
 const getAuthorLabel = (comment: PromptComment | undefined) =>
   comment?.authorName ?? comment?.authorEmail ?? "Unknown";
 
-export function PromptCommentsDialog({ prompt, open, onOpenChange }: PromptCommentsDialogProps) {
+export function PromptCommentsDialog({
+  prompt,
+  open,
+  onOpenChange,
+  onCommentCountChange,
+}: PromptCommentsDialogProps) {
   const [comments, setComments] = useState<PromptComment[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -88,7 +94,9 @@ export function PromptCommentsDialog({ prompt, open, onOpenChange }: PromptComme
     getPromptComments(prompt.id)
       .then((data) => {
         if (!isMounted) return;
-        setComments(sortByCreatedAt(flattenComments(data)));
+        const flattened = sortByCreatedAt(flattenComments(data));
+        setComments(flattened);
+        onCommentCountChange?.(flattened.length);
       })
       .catch((err: unknown) => {
         if (!isMounted) return;
@@ -101,7 +109,7 @@ export function PromptCommentsDialog({ prompt, open, onOpenChange }: PromptComme
     return () => {
       isMounted = false;
     };
-  }, [open, prompt.id]);
+  }, [open, prompt.id, onCommentCountChange]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -113,9 +121,11 @@ export function PromptCommentsDialog({ prompt, open, onOpenChange }: PromptComme
         body: trimmed,
         parentId: newComment.parentId ?? undefined,
       });
-      setComments((current) =>
-        sortByCreatedAt([...current, { ...created, replies: [] }])
-      );
+      setComments((current) => {
+        const next = sortByCreatedAt([...current, { ...created, replies: [] }]);
+        onCommentCountChange?.(next.length);
+        return next;
+      });
       setNewComment(defaultNewComment);
       setError(null);
       setReplyAnnouncement("Comment posted.");

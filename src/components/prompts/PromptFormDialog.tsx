@@ -39,6 +39,21 @@ const getFocusableElements = (container: HTMLElement) =>
     (element) => !element.hasAttribute("data-focus-guard")
   );
 
+const CloseIcon = ({ className }: { className?: string }) => (
+  <svg
+    className={className}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="m6 6 12 12" />
+    <path d="m6 18 12-12" />
+  </svg>
+);
+
 const defaultValues: PromptFormValues = {
   title: "",
   body: "",
@@ -59,7 +74,12 @@ export function PromptFormDialog({
 }: PromptFormDialogProps) {
   const values = initialValues ?? defaultValues;
   const initialSnapshot = useMemo(
-    () => ({ title: values.title, body: values.body, tags: values.tags, notes: values.notes ?? "" }),
+    () => ({
+      title: values.title,
+      body: values.body,
+      tags: [...values.tags],
+      notes: values.notes ?? "",
+    }),
     [values.title, values.body, values.tags, values.notes]
   );
 
@@ -79,7 +99,7 @@ export function PromptFormDialog({
     if (!open) {
       setTitle(initialSnapshot.title);
       setBody(initialSnapshot.body);
-      setTags(initialSnapshot.tags);
+      setTags([...initialSnapshot.tags]);
       setNotes(initialSnapshot.notes ?? "");
       setTagInput("");
       setErrors({});
@@ -90,7 +110,7 @@ export function PromptFormDialog({
     lastActiveElement.current = document.activeElement as HTMLElement | null;
     setTitle(initialSnapshot.title);
     setBody(initialSnapshot.body);
-    setTags(initialSnapshot.tags);
+    setTags([...initialSnapshot.tags]);
     setNotes(initialSnapshot.notes ?? "");
     setTagInput("");
 
@@ -141,7 +161,10 @@ export function PromptFormDialog({
   }, [open, onOpenChange, initialSnapshot]);
 
   const addTagsFromInput = () => {
-    const parts = tagInput.split(/[\s,]+/).map(normalizeTag).filter(Boolean);
+    const parts = tagInput
+      .split(/[\s,]+/)
+      .map(normalizeTag)
+      .filter(Boolean);
     if (parts.length === 0) {
       setTagInput("");
       return;
@@ -168,8 +191,13 @@ export function PromptFormDialog({
     setErrors((prev) => ({ ...prev, tags: message }));
   };
 
-  const removeTag = (tag: string) => {
-    setTags((current) => current.filter((item) => item !== tag));
+  const removeTagAt = (index: number) => {
+    setTags((current) => {
+      if (index < 0 || index >= current.length) return current;
+      const next = current.slice();
+      next.splice(index, 1);
+      return next;
+    });
   };
 
   const validate = (): Errors => {
@@ -229,7 +257,8 @@ export function PromptFormDialog({
       onOpenChange(false);
     } catch (error) {
       setErrors({
-        form: error instanceof Error ? error.message : "Failed to submit prompt.",
+        form:
+          error instanceof Error ? error.message : "Failed to submit prompt.",
       });
     } finally {
       setSubmitting(false);
@@ -247,7 +276,8 @@ export function PromptFormDialog({
     (mode === "create"
       ? "Provide prompt details to add it to your library."
       : "Update the prompt details and save your changes.");
-  const primaryLabel = submitLabel ?? (mode === "create" ? "Save prompt" : "Update prompt");
+  const primaryLabel =
+    submitLabel ?? (mode === "create" ? "Save prompt" : "Update prompt");
 
   return (
     <div
@@ -269,10 +299,15 @@ export function PromptFormDialog({
         <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
           <header className="flex items-start justify-between gap-3">
             <div className="flex flex-col gap-1">
-              <h2 id="prompt-form-heading" className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+              <h2
+                id="prompt-form-heading"
+                className="text-xl font-semibold text-slate-900 dark:text-slate-100"
+              >
                 {dialogHeading}
               </h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400">{dialogDescription}</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                {dialogDescription}
+              </p>
             </div>
             <button
               type="button"
@@ -286,7 +321,9 @@ export function PromptFormDialog({
 
           <div className="flex flex-col gap-4">
             <label className="flex flex-col gap-1">
-              <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Title</span>
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                Title
+              </span>
               <input
                 ref={titleRef}
                 type="text"
@@ -305,7 +342,9 @@ export function PromptFormDialog({
             </label>
 
             <label className="flex flex-col gap-1">
-              <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Body</span>
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                Body
+              </span>
               <textarea
                 value={body}
                 onChange={(event) => setBody(event.target.value)}
@@ -323,7 +362,9 @@ export function PromptFormDialog({
             </label>
 
             <label className="flex flex-col gap-1">
-              <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Notes</span>
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                Notes
+              </span>
               <textarea
                 value={notes}
                 onChange={(event) => setNotes(event.target.value)}
@@ -334,7 +375,13 @@ export function PromptFormDialog({
                 placeholder="Add internal notes or context (optional)"
               />
               <div className="flex items-center justify-between text-xs">
-                <span className={errors.notes ? "text-red-500" : "text-slate-400 dark:text-slate-500"}>
+                <span
+                  className={
+                    errors.notes
+                      ? "text-red-500"
+                      : "text-slate-400 dark:text-slate-500"
+                  }
+                >
                   {errors.notes ?? "Visible to collaborators only."}
                 </span>
                 <span className="text-slate-400 dark:text-slate-500">{`${notes.length}/4000`}</span>
@@ -344,18 +391,21 @@ export function PromptFormDialog({
             <div className="flex flex-col gap-2">
               <label className="flex flex-col gap-1">
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                  Tags <span className="text-xs font-normal text-slate-400 dark:text-slate-500">({tagHint})</span>
+                  Tags{" "}
+                  <span className="text-xs font-normal text-slate-400 dark:text-slate-500">
+                    ({tagHint})
+                  </span>
                 </span>
                 <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-300 bg-white/60 px-3 py-2 shadow-inner transition focus-within:border-violet-400 focus-within:ring-2 focus-within:ring-violet-400/60 dark:border-slate-700 dark:bg-slate-900/60 dark:focus-within:border-violet-500 dark:focus-within:ring-violet-500/60">
-                  {tags.map((tag) => (
+                  {tags.map((tag, index) => (
                     <span
-                      key={tag}
+                      key={`${tag}-${index}`}
                       className="inline-flex items-center gap-2 rounded-full bg-violet-100/80 px-3 py-1 text-xs font-medium lowercase text-violet-700 dark:bg-violet-500/10 dark:text-violet-200"
                     >
                       {tag}
                       <button
                         type="button"
-                        onClick={() => removeTag(tag)}
+                        onClick={() => removeTagAt(index)}
                         className="rounded-full p-1 text-violet-600 transition hover:bg-violet-200/70 focus:outline-none focus:ring-2 focus:ring-violet-400/60 dark:text-violet-200 dark:hover:bg-violet-500/30 dark:focus:ring-violet-500/60"
                         aria-label={`Remove tag ${tag}`}
                       >
@@ -372,9 +422,13 @@ export function PromptFormDialog({
                       if (event.key === "Enter" || event.key === ",") {
                         event.preventDefault();
                         addTagsFromInput();
-                      } else if (event.key === "Backspace" && !tagInput && tags.length > 0) {
+                      } else if (
+                        event.key === "Backspace" &&
+                        !tagInput &&
+                        tags.length > 0
+                      ) {
                         event.preventDefault();
-                        removeTag(tags[tags.length - 1]);
+                        removeTagAt(tags.length - 1);
                       }
                     }}
                     placeholder={tags.length ? "Add another tag" : "Add tags"}
@@ -389,7 +443,8 @@ export function PromptFormDialog({
                 </span>
               ) : (
                 <span className="text-xs text-slate-400 dark:text-slate-500">
-                  Press Enter or comma to create a tag. Tags are normalized to lowercase.
+                  Press Enter or comma to create a tag. Tags are normalized to
+                  lowercase.
                 </span>
               )}
             </div>
@@ -422,5 +477,3 @@ export function PromptFormDialog({
     </div>
   );
 }
-
-export type { PromptFormValues };

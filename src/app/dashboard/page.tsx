@@ -10,9 +10,12 @@ import { normalizeTag } from "@/lib/tag";
 import { PromptWithTags } from "@/types/prompt";
 
 const sortByUpdated = (items: PromptWithTags[]) =>
-  [...items].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+  [...items].sort(
+    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+  );
 
-const sortTags = (values: string[]) => [...values].sort((a, b) => a.localeCompare(b));
+const sortTags = (values: string[]) =>
+  [...values].sort((a, b) => a.localeCompare(b));
 
 const arraysEqual = (a: string[], b: string[]) => {
   if (a.length !== b.length) return false;
@@ -28,7 +31,9 @@ const promptMatchesFilters = (
 ): boolean => {
   const normalizedQuery = query.trim().toLowerCase();
   if (normalizedQuery) {
-    const haystack = `${prompt.title} ${prompt.body} ${prompt.notes ?? ""}`.toLowerCase();
+    const haystack = `${prompt.title} ${prompt.body} ${
+      prompt.notes ?? ""
+    }`.toLowerCase();
     if (!haystack.includes(normalizedQuery)) {
       return false;
     }
@@ -49,7 +54,8 @@ export default function DashboardPage() {
 
   const initialSearch = searchParams.get("q") ?? "";
   const initialTags = useMemo(
-    () => sortTags(searchParams.getAll("tag").map(normalizeTag).filter(Boolean)),
+    () =>
+      sortTags(searchParams.getAll("tag").map(normalizeTag).filter(Boolean)),
     [searchParams]
   );
 
@@ -67,16 +73,19 @@ export default function DashboardPage() {
 
   const requestRef = useRef(0);
 
-  const buildAvailableTags = useCallback((items: PromptWithTags[], baseTags: string[] = []) => {
-    const tagSet = new Set(baseTags);
-    items.forEach((item) => {
-      item.tags.forEach(({ tag }) => {
-        const normalized = normalizeTag(tag.name);
-        if (normalized) tagSet.add(normalized);
+  const buildAvailableTags = useCallback(
+    (items: PromptWithTags[], baseTags: string[] = []) => {
+      const tagSet = new Set(baseTags);
+      items.forEach((item) => {
+        item.tags.forEach(({ tag }) => {
+          const normalized = normalizeTag(tag.name);
+          if (normalized) tagSet.add(normalized);
+        });
       });
-    });
-    return Array.from(tagSet).sort((a, b) => a.localeCompare(b));
-  }, []);
+      return Array.from(tagSet).sort((a, b) => a.localeCompare(b));
+    },
+    []
+  );
 
   useEffect(() => {
     const handle = window.setTimeout(() => {
@@ -87,12 +96,18 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const paramsSearch = searchParams.get("q") ?? "";
-    const paramsTags = sortTags(searchParams.getAll("tag").map(normalizeTag).filter(Boolean));
+    const paramsTags = sortTags(
+      searchParams.getAll("tag").map(normalizeTag).filter(Boolean)
+    );
 
     setSearchInput((prev) => (prev === paramsSearch ? prev : paramsSearch));
     setSearchTerm((prev) => (prev === paramsSearch ? prev : paramsSearch));
-    setSelectedTags((prev) => (arraysEqual(prev, paramsTags) ? prev : paramsTags));
-    setDebouncedTags((prev) => (arraysEqual(prev, paramsTags) ? prev : paramsTags));
+    setSelectedTags((prev) =>
+      arraysEqual(prev, paramsTags) ? prev : paramsTags
+    );
+    setDebouncedTags((prev) =>
+      arraysEqual(prev, paramsTags) ? prev : paramsTags
+    );
   }, [searchParams]);
 
   const loadPrompts = useCallback(
@@ -108,7 +123,9 @@ export default function DashboardPage() {
         setAvailableTags(buildAvailableTags(sorted, tags));
       } catch (err) {
         if (requestId !== requestRef.current) return;
-        setError(err instanceof Error ? err.message : "Failed to load prompts.");
+        setError(
+          err instanceof Error ? err.message : "Failed to load prompts."
+        );
       } finally {
         if (requestId === requestRef.current) {
           setLoading(false);
@@ -170,7 +187,9 @@ export default function DashboardPage() {
   const handlePromptDeleted = useCallback(
     (promptId: string) => {
       setPrompts((current) => {
-        const next = sortByUpdated(current.filter((item) => item.id !== promptId));
+        const next = sortByUpdated(
+          current.filter((item) => item.id !== promptId)
+        );
         setAvailableTags(buildAvailableTags(next, debouncedTags));
         return next;
       });
@@ -185,12 +204,6 @@ export default function DashboardPage() {
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-10 text-slate-900 transition-colors dark:bg-slate-950 dark:text-slate-100">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
-        <header className="flex flex-col gap-2">
-          <h1 className="text-3xl font-semibold tracking-tight">Prompt QX</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            Browse, search, and curate prompts with a focus on clarity.
-          </p>
-        </header>
         <PromptList
           prompts={prompts}
           loading={loading}
