@@ -100,8 +100,8 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
       }`}
     >
       <span
-        className={`pointer-events-none absolute inset-y-1 w-5 rounded-full bg-violet-500/80 shadow transition-transform dark:bg-violet-400/80 ${
-          theme === "dark" ? "translate-x-6" : "translate-x-1"
+        className={`pointer-events-none absolute inset-y-1 left-1 w-5 rounded-full bg-violet-500/80 shadow transition-transform duration-200 ease-out dark:bg-violet-400/80 ${
+          theme === "dark" ? "translate-x-5" : "translate-x-0"
         }`}
       />
     </button>

@@ -1,6 +1,13 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import {
+  FormEvent,
+  KeyboardEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { createPromptComment, getPromptComments } from "@/lib/api";
 import { formatUpdatedAt } from "@/lib/format";
@@ -31,75 +38,17 @@ const sortByCreatedAt = (nodes: PromptComment[]) =>
 
 const flattenComments = (nodes: PromptComment[]): PromptComment[] => {
   return nodes.reduce<PromptComment[]>((acc, node) => {
-    acc.push(node);
-    if (node.replies?.length) {
-      acc.push(...flattenComments(node.replies));
+    const replies = node.replies;
+    acc.push({ ...node, replies: [] });
+    if (replies?.length) {
+      acc.push(...flattenComments(replies));
     }
     return acc;
   }, []);
 };
 
-const insertCommentIntoTree = (tree: PromptComment[], comment: PromptComment): PromptComment[] => {
-  if (!comment.parentId) {
-    return sortByCreatedAt([...tree, comment]);
-  }
-  const next = tree.map((node) => {
-    if (node.id === comment.parentId) {
-      return {
-        ...node,
-        replies: insertCommentIntoTree(node.replies ?? [], comment),
-      };
-    }
-    return {
-      ...node,
-      replies: insertCommentIntoTree(node.replies ?? [], comment),
-    };
-  });
-  if (!tree.some((node) => node.id === comment.parentId)) {
-    return sortByCreatedAt([...tree, comment]);
-  }
-  return sortByCreatedAt(next);
-};
-
-const CommentThread = ({
-  comments,
-  depth = 0,
-  onReply,
-}: {
-  comments: PromptComment[];
-  depth?: number;
-  onReply: (comment: PromptComment) => void;
-}) => {
-  return (
-    <div className="flex flex-col gap-3">
-      {comments.map((comment) => (
-        <div key={comment.id} className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white/80 p-3 text-sm shadow-sm transition dark:border-slate-800 dark:bg-slate-900/60" style={{ marginLeft: depth ? depth * 16 : 0 }}>
-          <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-            <span className="font-medium text-slate-600 dark:text-slate-200">
-              {comment.authorName ?? comment.authorEmail ?? "Unknown"}
-            </span>
-            <time dateTime={comment.createdAt}>{formatUpdatedAt(comment.createdAt)}</time>
-          </div>
-          <p className="whitespace-pre-wrap break-words text-slate-700 dark:text-slate-300">
-            {comment.body}
-          </p>
-          <div className="flex items-center gap-3 text-xs text-violet-600 dark:text-violet-300">
-            <button
-              type="button"
-              onClick={() => onReply(comment)}
-              className="font-medium hover:underline"
-            >
-              Reply
-            </button>
-          </div>
-          {comment.replies && comment.replies.length > 0 ? (
-            <CommentThread comments={comment.replies} depth={depth + 1} onReply={onReply} />
-          ) : null}
-        </div>
-      ))}
-    </div>
-  );
-};
+const getAuthorLabel = (comment: PromptComment | undefined) =>
+  comment?.authorName ?? comment?.authorEmail ?? "Unknown";
 
 export function PromptCommentsDialog({ prompt, open, onOpenChange }: PromptCommentsDialogProps) {
   const [comments, setComments] = useState<PromptComment[]>([]);
@@ -107,12 +56,28 @@ export function PromptCommentsDialog({ prompt, open, onOpenChange }: PromptComme
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [newComment, setNewComment] = useState<NewCommentState>(defaultNewComment);
+  const [replyAnnouncement, setReplyAnnouncement] = useState("");
+  const formRef = useRef<HTMLFormElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const commentRefs = useRef<Record<string, HTMLElement | null>>({});
+  const isInitialRender = useRef(true);
+
+  const commentMap = useMemo(() => {
+    const map = new Map<string, PromptComment>();
+    comments.forEach((comment) => {
+      map.set(comment.id, comment);
+    });
+    return map;
+  }, [comments]);
+
+  const sortedComments = useMemo(() => sortByCreatedAt(comments), [comments]);
 
   useEffect(() => {
     if (!open) {
       setComments([]);
       setError(null);
       setNewComment(defaultNewComment);
+      setReplyAnnouncement("");
       return;
     }
 
@@ -123,7 +88,7 @@ export function PromptCommentsDialog({ prompt, open, onOpenChange }: PromptComme
     getPromptComments(prompt.id)
       .then((data) => {
         if (!isMounted) return;
-        setComments(data);
+        setComments(sortByCreatedAt(flattenComments(data)));
       })
       .catch((err: unknown) => {
         if (!isMounted) return;
@@ -148,9 +113,12 @@ export function PromptCommentsDialog({ prompt, open, onOpenChange }: PromptComme
         body: trimmed,
         parentId: newComment.parentId ?? undefined,
       });
-      setComments((current) => insertCommentIntoTree(current, created));
+      setComments((current) =>
+        sortByCreatedAt([...current, { ...created, replies: [] }])
+      );
       setNewComment(defaultNewComment);
       setError(null);
+      setReplyAnnouncement("Comment posted.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to post comment.");
     } finally {
@@ -158,13 +126,53 @@ export function PromptCommentsDialog({ prompt, open, onOpenChange }: PromptComme
     }
   };
 
-  const replyLabel = useMemo(() => {
-    if (!newComment.parentId) return null;
-    const target = flattenComments(comments).find(
-      (comment) => comment.id === newComment.parentId
-    );
-    return target?.authorName ?? target?.authorEmail ?? "";
-  }, [comments, newComment.parentId]);
+  const replyTarget = newComment.parentId
+    ? commentMap.get(newComment.parentId)
+    : undefined;
+
+  useEffect(() => {
+    if (isInitialRender.current) {
+      isInitialRender.current = false;
+      if (!newComment.parentId) {
+        return;
+      }
+    }
+    if (!newComment.parentId) {
+      setReplyAnnouncement("Reply mode cleared.");
+      return;
+    }
+    const authorLabel = getAuthorLabel(replyTarget);
+    setReplyAnnouncement(`Replying to ${authorLabel}.`);
+  }, [newComment.parentId, replyTarget]);
+
+  const handleComposerKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      if (!submitting && newComment.body.trim()) {
+        formRef.current?.requestSubmit();
+      }
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setNewComment((prev) => ({ ...prev, parentId: null }));
+      textareaRef.current?.focus();
+    }
+  };
+
+  const handleReply = (comment: PromptComment) => {
+    setNewComment((prev) => ({ ...prev, parentId: comment.id }));
+    textareaRef.current?.focus();
+  };
+
+  const handleScrollToParent = (parentId: string | null | undefined) => {
+    if (!parentId) return;
+    const node = commentRefs.current[parentId];
+    if (node) {
+      node.scrollIntoView({ behavior: "smooth", block: "start" });
+      node.focus({ preventScroll: true });
+    }
+  };
 
   if (!open) return null;
 
@@ -210,26 +218,116 @@ export function PromptCommentsDialog({ prompt, open, onOpenChange }: PromptComme
               No comments yet. Start the conversation below.
             </p>
           ) : (
-            <CommentThread comments={comments} onReply={(comment) => setNewComment({ body: "", parentId: comment.id })} />
+            <div className="flex flex-col gap-3">
+              {sortedComments.map((comment) => {
+                const parent = comment.parentId
+                  ? commentMap.get(comment.parentId)
+                  : undefined;
+                const parentAuthor = parent ? getAuthorLabel(parent) : "";
+                const parentTimestamp = parent ? formatUpdatedAt(parent.createdAt) : "";
+                const parentSnippet = parent
+                  ? parent.body
+                  : "Original comment was deleted.";
+
+                return (
+                  <article
+                    key={comment.id}
+                    id={`comment-${comment.id}`}
+                    ref={(node) => {
+                      commentRefs.current[comment.id] = node;
+                    }}
+                    tabIndex={-1}
+                    className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white/80 p-3 text-sm shadow-sm transition focus:outline-none focus:ring-2 focus:ring-violet-400/50 dark:border-slate-800 dark:bg-slate-900/60 dark:focus:ring-violet-500/50"
+                  >
+                    <header className="flex flex-col gap-1 text-xs text-slate-500 dark:text-slate-400">
+                      {comment.parentId ? (
+                        <button
+                          type="button"
+                          onClick={() => handleScrollToParent(comment.parentId ?? null)}
+                          disabled={!parent}
+                          className="flex flex-col items-start gap-1 rounded-lg bg-slate-100/80 px-2 py-1 text-left font-medium text-slate-500 transition hover:bg-slate-200/80 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-800/60 dark:text-slate-300 dark:hover:bg-slate-700/60"
+                        >
+                          <span className="text-[11px] uppercase tracking-wide">Reply to</span>
+                          <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                            {parentAuthor || "Original comment was deleted."}
+                          </span>
+                          {parentTimestamp ? (
+                            <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                              {parentTimestamp}
+                            </span>
+                          ) : null}
+                          <span className="line-clamp-2 text-xs font-normal text-slate-600 dark:text-slate-300">
+                            {parentSnippet}
+                          </span>
+                        </button>
+                      ) : null}
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-slate-600 dark:text-slate-200">
+                          {getAuthorLabel(comment)}
+                        </span>
+                        <time dateTime={comment.createdAt} className="text-xs">
+                          {formatUpdatedAt(comment.createdAt)}
+                        </time>
+                      </div>
+                    </header>
+                    <div className="max-h-60 overflow-y-auto">
+                      <p className="whitespace-pre-wrap break-words text-slate-700 dark:text-slate-300">
+                        {comment.body}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-violet-600 dark:text-violet-300">
+                      <button
+                        type="button"
+                        onClick={() => handleReply(comment)}
+                        className="font-medium hover:underline"
+                      >
+                        Reply
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
           )}
         </div>
 
-        <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
-          {replyLabel ? (
-            <div className="flex items-center justify-between rounded-full bg-violet-100/60 px-3 py-1 text-xs text-violet-700 dark:bg-violet-500/20 dark:text-violet-200">
-              <span>Replying to {replyLabel}</span>
+        <form ref={formRef} className="flex flex-col gap-3" onSubmit={handleSubmit}>
+          <div aria-live="polite" className="sr-only">
+            {replyAnnouncement}
+          </div>
+          {newComment.parentId ? (
+            <div className="flex items-start justify-between gap-3 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-700 dark:border-violet-500/50 dark:bg-violet-500/10 dark:text-violet-200">
+              <div className="flex flex-1 flex-col gap-1">
+                <span className="font-semibold uppercase tracking-wide text-[11px]">Replying to</span>
+                <span className="text-sm font-medium">
+                  {replyTarget ? getAuthorLabel(replyTarget) : "Original comment was deleted."}
+                </span>
+                {replyTarget ? (
+                  <span className="text-[11px] text-violet-600/80 dark:text-violet-200/80">
+                    {formatUpdatedAt(replyTarget.createdAt)}
+                  </span>
+                ) : null}
+                <p className="line-clamp-3 whitespace-pre-wrap text-left text-sm text-violet-700/90 dark:text-violet-100/80">
+                  {replyTarget ? replyTarget.body : "Original comment was deleted."}
+                </p>
+              </div>
               <button
                 type="button"
-                onClick={() => setNewComment(defaultNewComment)}
-                className="font-semibold hover:underline"
+                onClick={() => setNewComment((prev) => ({ ...prev, parentId: null }))}
+                className="rounded-full p-1 text-sm font-semibold text-violet-600 transition hover:bg-violet-100 dark:text-violet-200 dark:hover:bg-violet-500/20"
+                aria-label="Cancel reply"
               >
-                Cancel
+                ✕
               </button>
             </div>
           ) : null}
           <textarea
             value={newComment.body}
-            onChange={(event) => setNewComment((prev) => ({ ...prev, body: event.target.value }))}
+            onChange={(event) =>
+              setNewComment((prev) => ({ ...prev, body: event.target.value }))
+            }
+            onKeyDown={handleComposerKeyDown}
+            ref={textareaRef}
             rows={3}
             maxLength={MAX_COMMENT_LENGTH}
             placeholder="Leave a comment"

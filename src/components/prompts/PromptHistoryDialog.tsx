@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { UIEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode, UIEvent } from "react";
 
 import { deletePromptVersion, getPromptVersions } from "@/lib/api";
 import { formatUpdatedAt } from "@/lib/format";
@@ -12,6 +12,21 @@ const focusableSelector =
 
 const ROW_HEIGHT = 24;
 const OVERSCAN = 12;
+
+const CloseIcon = ({ className }: { className?: string }) => (
+  <svg
+    className={className}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="m6 6 12 12" />
+    <path d="m6 18 12-12" />
+  </svg>
+);
 
 type PromptHistoryDialogProps = {
   prompt: PromptWithTags;
@@ -127,6 +142,10 @@ export function PromptHistoryDialog({
   const [panelHeight, setPanelHeight] = useState(400);
   const [pastScrollTop, setPastScrollTop] = useState(0);
 
+  const handleClose = useCallback(() => {
+    onOpenChange(false);
+  }, [onOpenChange]);
+
   useEffect(() => {
     if (!open) return;
 
@@ -148,7 +167,7 @@ export function PromptHistoryDialog({
       if (!open) return;
       if (event.key === "Escape") {
         event.preventDefault();
-        onOpenChange(false);
+        handleClose();
         return;
       }
       if (event.key === "Tab") {
@@ -181,7 +200,7 @@ export function PromptHistoryDialog({
       document.removeEventListener("keydown", handleKeyDown);
       lastActiveElement.current?.focus();
     };
-  }, [open, onOpenChange]);
+  }, [handleClose, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -344,7 +363,7 @@ export function PromptHistoryDialog({
     column: "current" | "previous"
   ) => {
     const totalHeight = rows.length * ROW_HEIGHT;
-    const items: JSX.Element[] = [];
+    const items: ReactNode[] = [];
     for (let idx = startIndex; idx < endIndex; idx += 1) {
       const row = rows[idx];
       items.push(getLineMarkup(row, column, `${column}-body-${idx}`));
@@ -366,7 +385,7 @@ export function PromptHistoryDialog({
       role="presentation"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) {
-          onOpenChange(false);
+          handleClose();
         }
       }}
     >
@@ -378,23 +397,21 @@ export function PromptHistoryDialog({
         className="flex h-[80vh] w-full max-w-6xl flex-col gap-4 overflow-hidden rounded-2xl border border-violet-200 bg-white p-6 shadow-2xl shadow-violet-500/20 transition dark:border-violet-500/40 dark:bg-slate-900"
       >
         <header className="flex flex-col gap-2">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <h2
-                id="prompt-history-heading"
-                className="text-right text-xl font-semibold text-slate-900 dark:text-slate-100"
-              >
-                Prompt history
-              </h2>
-              <button
-                type="button"
-                onClick={() => onOpenChange(false)}
-                className="rounded-full border border-transparent p-2 text-slate-500 transition hover:border-slate-300 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-400/60 dark:text-slate-400 dark:hover:border-slate-700 dark:hover:text-slate-200 dark:focus:ring-violet-500/60"
-                aria-label="Close history dialog"
-              >
-                ✕
-              </button>
-            </div>
+          <div className="flex items-start justify-between gap-3">
+            <h2
+              id="prompt-history-heading"
+              className="text-xl font-semibold text-slate-900 dark:text-slate-100"
+            >
+              Prompt history
+            </h2>
+            <button
+              type="button"
+              onClick={handleClose}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-transparent text-slate-500 transition hover:border-slate-300 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-400/60 dark:text-slate-400 dark:hover:border-slate-700 dark:hover:text-slate-200 dark:focus:ring-violet-500/60"
+              aria-label="Close"
+            >
+              <CloseIcon className="h-5 w-5" />
+            </button>
           </div>
           <p className="text-sm text-slate-500 dark:text-slate-400">
             Compare past versions of this prompt and review previous edits.
