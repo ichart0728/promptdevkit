@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { ThemeToggle, SunIcon, MoonIcon } from "@/components/ui/ThemeToggle";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -23,11 +24,28 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html
+      lang="en"
+      className="light"
+      data-theme="light"
+      suppressHydrationWarning
+    >
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-slate-50 text-slate-900 transition-colors dark:bg-slate-950 dark:text-slate-100`}
       >
-        {children}
+        <div className="flex min-h-screen flex-col">
+          <header className="flex items-center justify-between gap-4 border-b border-slate-200 bg-white/70 px-6 py-4 shadow-sm transition-colors dark:border-slate-800 dark:bg-slate-900/70">
+            <div className="text-sm font-semibold uppercase tracking-wide text-violet-600 dark:text-violet-300">
+              PromptDevKit
+            </div>
+            <div className="flex items-center gap-2 text-slate-500 dark:text-slate-300">
+              <SunIcon className="h-4 w-4" />
+              <ThemeToggle className="h-6 w-10" />
+              <MoonIcon className="h-4 w-4" />
+            </div>
+          </header>
+          <main className="flex-1">{children}</main>
+        </div>
       </body>
     </html>
   );

@@ -1,4 +1,3 @@
-import { auth } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
 import {
   formatValidationError,
@@ -51,6 +50,7 @@ export async function GET(req: Request) {
       OR: [
         { title: { contains: q, mode: "insensitive" } },
         { body: { contains: q, mode: "insensitive" } },
+        { notes: { contains: q, mode: "insensitive" } },
       ],
     });
   }
@@ -117,6 +117,7 @@ export async function POST(req: Request) {
   const normalizedTags = normalizeTags(data.tags);
   const logging = data.logging ?? false;
   const teamId = typeof data.teamId === "string" ? data.teamId : undefined;
+  const notes = typeof data.notes === "string" && data.notes.trim() ? data.notes.trim() : null;
 
   const isTeamPrompt = Boolean(teamId);
 
@@ -139,6 +140,7 @@ export async function POST(req: Request) {
       body: data.body,
       variables,
       logging,
+      notes,
       ownerId: isTeamPrompt ? null : session.user.id,
       teamId: isTeamPrompt ? teamId! : null,
       createdById: session.user.id,
