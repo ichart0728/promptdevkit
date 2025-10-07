@@ -11,11 +11,15 @@ export type PromptFormValues = {
   notes?: string;
 };
 
+export type PromptFormSubmitValues = PromptFormValues & {
+  removedTags: string[];
+};
+
 type PromptFormDialogProps = {
   mode: "create" | "edit";
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (values: PromptFormValues) => Promise<void>;
+  onSubmit: (values: PromptFormSubmitValues) => Promise<void>;
   initialValues?: PromptFormValues;
   heading?: string;
   description?: string;
@@ -191,9 +195,10 @@ export function PromptFormDialog({
     setErrors((prev) => ({ ...prev, tags: message }));
   };
 
-  const removeTagAt = (index: number) => {
+  const removeTagAt = (index: number, expected?: string) => {
     setTags((current) => {
       if (index < 0 || index >= current.length) return current;
+      if (expected !== undefined && current[index] !== expected) return current;
       const next = current.slice();
       next.splice(index, 1);
       return next;
@@ -243,6 +248,12 @@ export function PromptFormDialog({
     const trimmedBody = body.trim();
     const trimmedNotes = notes.trim();
     const normalizedTags = tags.length ? normalizeTagList(tags) : [];
+    const initialTags = initialSnapshot.tags.length
+      ? normalizeTagList(initialSnapshot.tags)
+      : [];
+    const removedTags = initialTags.filter(
+      (tag) => !normalizedTags.includes(tag)
+    );
 
     setSubmitting(true);
     setErrors({});
@@ -253,6 +264,7 @@ export function PromptFormDialog({
         body: trimmedBody,
         tags: normalizedTags,
         notes: trimmedNotes ? trimmedNotes : undefined,
+        removedTags,
       });
       onOpenChange(false);
     } catch (error) {
@@ -391,7 +403,7 @@ export function PromptFormDialog({
             <div className="flex flex-col gap-2">
               <label className="flex flex-col gap-1">
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                  Tags{" "}
+                  Tags
                   <span className="text-xs font-normal text-slate-400 dark:text-slate-500">
                     ({tagHint})
                   </span>
@@ -405,7 +417,11 @@ export function PromptFormDialog({
                       {tag}
                       <button
                         type="button"
-                        onClick={() => removeTagAt(index)}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          removeTagAt(index, tag);
+                        }}
                         className="rounded-full p-1 text-violet-600 transition hover:bg-violet-200/70 focus:outline-none focus:ring-2 focus:ring-violet-400/60 dark:text-violet-200 dark:hover:bg-violet-500/30 dark:focus:ring-violet-500/60"
                         aria-label={`Remove tag ${tag}`}
                       >
@@ -413,6 +429,7 @@ export function PromptFormDialog({
                       </button>
                     </span>
                   ))}
+
                   <input
                     type="text"
                     value={tagInput}
@@ -428,7 +445,8 @@ export function PromptFormDialog({
                         tags.length > 0
                       ) {
                         event.preventDefault();
-                        removeTagAt(tags.length - 1);
+                        const lastIndex = tags.length - 1;
+                        removeTagAt(lastIndex, tags[lastIndex]);
                       }
                     }}
                     placeholder={tags.length ? "Add another tag" : "Add tags"}

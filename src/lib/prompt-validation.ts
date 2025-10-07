@@ -54,7 +54,14 @@ export const promptCreationSchema = z
       .min(1, 'Body is required.')
       .max(PROMPT_BODY_MAX_LENGTH, `Body must be ${PROMPT_BODY_MAX_LENGTH} characters or fewer.`),
     variables: variablesSchema.optional(),
-    tags: z.array(tagInputSchema).max(PROMPT_TAG_MAX, `Provide ${PROMPT_TAG_MAX} tags or fewer.`).optional(),
+    tags: z
+      .array(tagInputSchema)
+      .max(PROMPT_TAG_MAX, `Provide ${PROMPT_TAG_MAX} tags or fewer.`)
+      .optional(),
+    removedTags: z
+      .array(tagInputSchema)
+      .max(PROMPT_TAG_MAX, `Provide ${PROMPT_TAG_MAX} tags or fewer.`)
+      .optional(),
     logging: z.boolean().optional(),
     teamId: z.string().trim().min(1).optional().nullable(),
     notes: z

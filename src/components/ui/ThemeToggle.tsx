@@ -10,7 +10,9 @@ const getPreferredTheme = (): Theme => {
   if (typeof window === "undefined") return "light";
   const stored = window.localStorage.getItem(STORAGE_KEY) as Theme | null;
   if (stored === "light" || stored === "dark") return stored;
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  return window.matchMedia("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
 };
 
 const applyTheme = (theme: Theme) => {
@@ -23,6 +25,7 @@ const applyTheme = (theme: Theme) => {
     root.classList.add("light");
   }
   root.dataset.theme = theme;
+  root.style.colorScheme = theme;
 };
 
 export const SunIcon = ({ className }: { className?: string }) => (
@@ -94,7 +97,9 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
       onClick={toggleTheme}
       disabled={!isInitialized}
       aria-pressed={theme === "dark"}
-      aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+      aria-label={
+        theme === "dark" ? "Switch to light theme" : "Switch to dark theme"
+      }
       className={`relative inline-flex h-7 w-12 items-center rounded-full border border-violet-300 bg-white/80 px-1 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-violet-400/60 disabled:cursor-not-allowed disabled:opacity-60 dark:border-violet-500/50 dark:bg-slate-900/80 ${
         className ?? ""
       }`}

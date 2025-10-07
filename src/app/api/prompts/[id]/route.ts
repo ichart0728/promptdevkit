@@ -88,14 +88,26 @@ export async function PATCH(req: Request, { params }: Params) {
 
   const data = parsed.data;
   const normalizedTags = normalizeTags(data.tags);
+  const removedTagsProvided = Array.isArray(data.removedTags);
+  const normalizedRemovedTags = removedTagsProvided
+    ? normalizeTags(data.removedTags)
+    : [];
   const currentTags = prompt.tags.map(({ tag }) => tag.name);
   const notes = typeof data.notes === "string" && data.notes.trim() ? data.notes.trim() : null;
+
+  const normalizedTagsSet = new Set(normalizedTags);
+  const tagsToAdd = normalizedTags.filter((name) => !currentTags.includes(name));
+  const tagsToRemove = removedTagsProvided
+    ? normalizedRemovedTags.filter((name) => currentTags.includes(name))
+    : currentTags.filter((name) => !normalizedTagsSet.has(name));
 
   const hasChanges =
     prompt.title !== data.title ||
     prompt.body !== data.body ||
     (prompt.notes ?? null) !== notes ||
-    !arraysEqual(currentTags, normalizedTags);
+    tagsToAdd.length > 0 ||
+    tagsToRemove.length > 0 ||
+    (!removedTagsProvided && !arraysEqual(currentTags, normalizedTags));
 
   if (!hasChanges) {
     return NextResponse.json(prompt);
@@ -118,11 +130,9 @@ export async function PATCH(req: Request, { params }: Params) {
     });
 
     const tagIdByName = new Map(prompt.tags.map((entry) => [entry.tag.name, entry.tagId]));
-    const tagsToRemove = currentTags.filter((name) => !normalizedTags.includes(name));
     const tagIdsToRemove = tagsToRemove
       .map((name) => tagIdByName.get(name))
       .filter((value): value is string => Boolean(value));
-    const tagsToAdd = normalizedTags.filter((name) => !tagIdByName.has(name));
 
     const updated = await tx.prompt.update({
       where: { id: prompt.id },

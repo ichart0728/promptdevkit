@@ -3,7 +3,10 @@
 import { createPrompt } from "@/lib/api";
 import { PromptWithTags } from "@/types/prompt";
 
-import { PromptFormDialog, type PromptFormValues } from "./PromptFormDialog";
+import {
+  PromptFormDialog,
+  type PromptFormSubmitValues,
+} from "./PromptFormDialog";
 
 type CreatePromptDialogProps = {
   open: boolean;
@@ -12,7 +15,7 @@ type CreatePromptDialogProps = {
 };
 
 export function CreatePromptDialog({ open, onOpenChange, onCreated }: CreatePromptDialogProps) {
-  const handleSubmit = async ({ title, body, tags, notes }: PromptFormValues) => {
+  const handleSubmit = async ({ title, body, tags, notes }: PromptFormSubmitValues) => {
     const prompt = await createPrompt({
       title,
       body,

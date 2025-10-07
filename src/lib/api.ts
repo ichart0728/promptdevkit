@@ -67,6 +67,7 @@ type UpdatePromptPayload = {
   body: string;
   tags?: string[];
   notes?: string;
+  removedTags?: string[];
 };
 
 export async function updatePrompt(id: string, payload: UpdatePromptPayload): Promise<PromptWithTags> {

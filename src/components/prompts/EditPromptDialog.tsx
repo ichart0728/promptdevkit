@@ -6,7 +6,11 @@ import { updatePrompt } from "@/lib/api";
 import { normalizeTag } from "@/lib/tag";
 import { PromptWithTags } from "@/types/prompt";
 
-import { PromptFormDialog, type PromptFormValues } from "./PromptFormDialog";
+import {
+  PromptFormDialog,
+  type PromptFormSubmitValues,
+  type PromptFormValues,
+} from "./PromptFormDialog";
 
 type EditPromptDialogProps = {
   prompt: PromptWithTags;
@@ -25,12 +29,19 @@ export function EditPromptDialog({ prompt, open, onOpenChange, onUpdated }: Edit
     } satisfies PromptFormValues;
   }, [prompt]);
 
-  const handleSubmit = async ({ title, body, tags, notes }: PromptFormValues) => {
+  const handleSubmit = async ({
+    title,
+    body,
+    tags,
+    notes,
+    removedTags,
+  }: PromptFormSubmitValues) => {
     const updated = await updatePrompt(prompt.id, {
       title,
       body,
       tags: tags.length ? tags : undefined,
       notes,
+      removedTags: removedTags.length ? removedTags : undefined,
     });
     await onUpdated(updated);
   };
