@@ -448,9 +448,8 @@ export function PromptHistoryDialog({
                       versions.map((version) => {
                         const isActive = version.id === selectedId;
                         return (
-                          <button
+                          <div
                             key={version.id}
-                            type="button"
                             onClick={() => setSelectedId(version.id)}
                             className={`group flex w-full flex-col rounded-xl border px-4 py-3 text-left transition focus:outline-none focus:ring-2 focus:ring-violet-400/60 dark:focus:ring-violet-500/60 ${
                               isActive
@@ -488,7 +487,7 @@ export function PromptHistoryDialog({
                             >
                               {version.body}
                             </p>
-                          </button>
+                          </div>
                         );
                       })
                     )}

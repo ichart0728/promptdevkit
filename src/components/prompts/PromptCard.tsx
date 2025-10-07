@@ -22,13 +22,19 @@ type PromptCardProps = {
 const MAX_VISIBLE_TAGS = 6;
 const BODY_LINE_HEIGHT_REM = 1.5;
 const BODY_VISIBLE_LINES = 3;
-const BODY_MAX_HEIGHT = `calc(${BODY_LINE_HEIGHT_REM}rem * ${BODY_VISIBLE_LINES + 0.5})`;
+const BODY_MAX_HEIGHT = `calc(${BODY_LINE_HEIGHT_REM}rem * ${
+  BODY_VISIBLE_LINES + 0.5
+})`;
 const NOTES_LINE_HEIGHT_REM = 1.25;
 const NOTES_VISIBLE_LINES = 3;
-const NOTES_MAX_HEIGHT = `calc(${NOTES_LINE_HEIGHT_REM}rem * ${NOTES_VISIBLE_LINES + 0.5})`;
+const NOTES_MAX_HEIGHT = `calc(${NOTES_LINE_HEIGHT_REM}rem * ${
+  NOTES_VISIBLE_LINES + 0.5
+})`;
 const TAG_ROW_HEIGHT_REM = 2;
 const TAG_VISIBLE_ROWS = 2;
-const TAG_MAX_HEIGHT = `calc(${TAG_ROW_HEIGHT_REM}rem * ${TAG_VISIBLE_ROWS + 0.5})`;
+const TAG_MAX_HEIGHT = `calc(${TAG_ROW_HEIGHT_REM}rem * ${
+  TAG_VISIBLE_ROWS + 0.5
+})`;
 
 const titleStyle = {
   display: "-webkit-box",
@@ -482,7 +488,6 @@ export function PromptCard({ prompt, onUpdated, onDeleted }: PromptCardProps) {
         prompt={promptData}
         open={detailsOpen}
         onOpenChange={setDetailsOpen}
-        onOpenComments={() => setCommentsOpen(true)}
       />
 
       <EditPromptDialog

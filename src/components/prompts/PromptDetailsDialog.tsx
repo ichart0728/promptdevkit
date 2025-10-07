@@ -50,14 +50,11 @@ export function PromptDetailsDialog({
   prompt,
   open,
   onOpenChange,
-  onOpenComments,
 }: PromptDetailsDialogProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const lastActiveElement = useRef<HTMLElement | null>(null);
 
   const commentCount = prompt.commentCount ?? 0;
-  const commentButtonLabel =
-    commentCount === 1 ? "1 comment" : `${commentCount} comments`;
   const formattedUpdatedAt = useMemo(
     () => formatUpdatedAt(prompt.updatedAt),
     [prompt.updatedAt]
@@ -151,20 +148,6 @@ export function PromptDetailsDialog({
               Prompt details
             </h2>
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  handleClose();
-                  onOpenComments?.();
-                }}
-                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-violet-300 hover:text-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-400/60 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:border-violet-500 dark:hover:text-violet-200 dark:focus:ring-violet-500/60"
-                aria-label={`View ${commentButtonLabel}`}
-                title={`View ${commentButtonLabel}`}
-                disabled={!onOpenComments}
-              >
-                <CommentIcon className="h-4 w-4" />
-                <span>{commentCount}</span>
-              </button>
               <button
                 type="button"
                 onClick={handleClose}
