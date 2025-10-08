@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { FadeInSection } from "@/components/fade-in-section";
+import { pricingPlans } from "@/data/pricing";
 
 const features = [
   {
@@ -71,47 +72,6 @@ const testimonials = [
     role: "Automation Lead, Flux Labs",
     quote:
       "“The compliance guardrails were an instant win. We can empower more teams without worrying about risk.”",
-  },
-];
-
-const pricingPlans = [
-  {
-    name: "Starter",
-    price: "Free",
-    description: "Perfect for individuals exploring prompt operations.",
-    features: [
-      "Unlimited personal prompts",
-      "Community templates",
-      "Basic analytics",
-    ],
-    cta: "Sign Up Free",
-    highlighted: false,
-  },
-  {
-    name: "Growth",
-    price: "$29",
-    description: "Unlock collaboration and workflow automation for teams.",
-    features: [
-      "Shared workspaces",
-      "Version control & reviews",
-      "Usage insights",
-      "Email support",
-    ],
-    cta: "Start 14-day Trial",
-    highlighted: true,
-  },
-  {
-    name: "Enterprise",
-    price: "Let’s talk",
-    description: "Advanced governance and integrations for large organizations.",
-    features: [
-      "Custom SLAs",
-      "Granular permissions",
-      "Dedicated success manager",
-      "Security reviews",
-    ],
-    cta: "Contact Sales",
-    highlighted: false,
   },
 ];
 
@@ -412,7 +372,14 @@ export default function Home() {
                 }`}
               >
                 <div className="space-y-4">
-                  <h3 className="text-xl font-semibold">{plan.name}</h3>
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="text-xl font-semibold">{plan.name}</h3>
+                    {plan.badge ? (
+                      <span className="rounded-full bg-purple-600/10 px-3 py-1 text-xs font-semibold text-purple-700 dark:bg-purple-500/20 dark:text-purple-200">
+                        {plan.badge}
+                      </span>
+                    ) : null}
+                  </div>
                   <div className="text-3xl font-semibold">{plan.price}</div>
                   <p className="text-sm text-muted-foreground">{plan.description}</p>
                   <ul className="space-y-2 text-sm text-muted-foreground">
@@ -422,7 +389,7 @@ export default function Home() {
                   </ul>
                 </div>
                 <Link
-                  href="/signin"
+                  href={plan.href}
                   className={`mt-6 inline-flex items-center justify-center rounded-full px-5 py-2 text-sm font-semibold transition ${
                     plan.highlighted
                       ? "bg-purple-600 text-white hover:bg-purple-500"

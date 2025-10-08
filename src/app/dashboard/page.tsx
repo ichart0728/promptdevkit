@@ -5,9 +5,12 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { CreatePromptDialog } from "@/components/prompts/CreatePromptDialog";
 import { PromptList } from "@/components/prompts/PromptList";
+import { UpgradePlanDialog } from "@/components/prompts/UpgradePlanDialog";
 import { getPrompts } from "@/lib/api";
 import { normalizeTag } from "@/lib/tag";
 import { PromptWithTags } from "@/types/prompt";
+
+const FREE_PLAN_PROMPT_LIMIT = 25;
 
 const sortByUpdated = (items: PromptWithTags[]) =>
   [...items].sort(
@@ -70,6 +73,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [upgradeDialogOpen, setUpgradeDialogOpen] = useState(false);
 
   const requestRef = useRef(0);
 
@@ -198,6 +202,10 @@ export default function DashboardPage() {
   );
 
   const handleAddPrompt = () => {
+    if (prompts.length >= FREE_PLAN_PROMPT_LIMIT) {
+      setUpgradeDialogOpen(true);
+      return;
+    }
     setDialogOpen(true);
   };
 
@@ -218,12 +226,20 @@ export default function DashboardPage() {
           onAddPrompt={handleAddPrompt}
           onPromptUpdated={handlePromptUpdated}
           onPromptDeleted={handlePromptDeleted}
+          freePlanLimit={FREE_PLAN_PROMPT_LIMIT}
+          onRequestUpgrade={() => setUpgradeDialogOpen(true)}
         />
       </div>
       <CreatePromptDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         onCreated={handlePromptCreated}
+      />
+      <UpgradePlanDialog
+        open={upgradeDialogOpen}
+        onOpenChange={setUpgradeDialogOpen}
+        currentUsage={prompts.length}
+        usageLimit={FREE_PLAN_PROMPT_LIMIT}
       />
     </main>
   );

@@ -23,6 +23,8 @@ type PromptListProps = {
   onAddPrompt: () => void;
   onPromptUpdated: (prompt: PromptWithTags) => void | Promise<void>;
   onPromptDeleted: (promptId: string) => void | Promise<void>;
+  freePlanLimit?: number;
+  onRequestUpgrade: () => void;
 };
 
 type PaginationControlsProps = {
@@ -152,6 +154,8 @@ export function PromptList({
   onAddPrompt,
   onPromptUpdated,
   onPromptDeleted,
+  freePlanLimit,
+  onRequestUpgrade,
 }: PromptListProps) {
   const pageSizeOptions = useMemo(() => [9, 18, 27], []);
   const [pageSize, setPageSize] = useState<number>(pageSizeOptions[0]);
@@ -180,6 +184,19 @@ export function PromptList({
   const showEmptyState = !loading && prompts.length === 0;
   const showSkeletonGrid = loading && prompts.length === 0;
 
+  const limit = freePlanLimit ?? 0;
+  const promptCount = prompts.length;
+  const isOverLimit = limit > 0 && promptCount >= limit;
+  const remaining = limit > 0 ? Math.max(limit - promptCount, 0) : 0;
+  const usageProgress = limit > 0 ? Math.min(100, Math.round((promptCount / limit) * 100)) : 0;
+  const showUsageBanner =
+    limit > 0 && (promptCount >= Math.ceil(limit * 0.5) || isOverLimit);
+
+  const addPromptLabel = isOverLimit ? "Upgrade to add more" : "＋ Add Prompt";
+  const addPromptClasses = isOverLimit
+    ? "inline-flex items-center gap-2 rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-white shadow transition hover:bg-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-300/60 dark:bg-amber-400 dark:hover:bg-amber-300 dark:focus:ring-amber-400/60"
+    : "inline-flex items-center gap-2 rounded-full bg-violet-600 px-4 py-2 text-sm font-semibold text-white shadow transition hover:bg-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-400/60 dark:bg-violet-500 dark:hover:bg-violet-400 dark:focus:ring-violet-500/60";
+
   return (
     <section className="flex flex-col gap-6">
       <div className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white/70 p-5 shadow-sm transition dark:border-slate-800 dark:bg-slate-900/70 dark:shadow-slate-900/50">
@@ -193,14 +210,47 @@ export function PromptList({
             <button
               type="button"
               onClick={onAddPrompt}
-              className="inline-flex items-center gap-2 rounded-full bg-violet-600 px-4 py-2 text-sm font-semibold text-white shadow transition hover:bg-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-400/60 dark:bg-violet-500 dark:hover:bg-violet-400 dark:focus:ring-violet-500/60"
+              className={addPromptClasses}
               aria-haspopup="dialog"
+              aria-label={addPromptLabel}
+              aria-disabled={isOverLimit}
             >
-              ＋ Add Prompt
+              {addPromptLabel}
             </button>
           </div>
         </div>
         <TagFilter options={availableTags} selected={selectedTags} onChange={onTagChange} />
+        {showUsageBanner ? (
+          <div className="flex flex-col gap-3 rounded-2xl border border-purple-200 bg-purple-50/70 p-4 dark:border-purple-500/40 dark:bg-purple-500/10">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-purple-700 dark:text-purple-200">
+                  {isOverLimit
+                    ? "Starter plan limit reached"
+                    : `Starter plan usage: ${promptCount}/${limit}`}
+                </p>
+                <p className="text-xs text-purple-700/80 dark:text-purple-200/80">
+                  {isOverLimit
+                    ? "Upgrade to keep creating prompts without restrictions."
+                    : `You have ${remaining} prompt${remaining === 1 ? "" : "s"} left before hitting the limit.`}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={onRequestUpgrade}
+                className="inline-flex items-center justify-center rounded-full bg-purple-600 px-4 py-2 text-sm font-semibold text-white shadow transition hover:bg-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-400/60 dark:bg-purple-500 dark:hover:bg-purple-400 dark:focus:ring-purple-500/60"
+              >
+                View plans
+              </button>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-purple-200/70 dark:bg-purple-500/30">
+              <div
+                className="h-full rounded-full bg-purple-600 transition-all dark:bg-purple-300"
+                style={{ width: `${usageProgress}%` }}
+              />
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {error ? (
