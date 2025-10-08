@@ -17,7 +17,7 @@ import {
   isTeamWorkspace,
 } from "@/types/workspace";
 
-const FREE_PLAN_PROMPT_LIMIT = 25;
+const FREE_PLAN_PROMPT_LIMIT = 3;
 
 const sortByUpdated = (items: PromptWithTags[]) =>
   [...items].sort(
@@ -78,6 +78,7 @@ export default function DashboardPage() {
   const [selectedTags, setSelectedTags] = useState<string[]>(initialTags);
   const [debouncedTags, setDebouncedTags] = useState<string[]>(initialTags);
   const [prompts, setPrompts] = useState<PromptWithTags[]>([]);
+  const [totalPromptCount, setTotalPromptCount] = useState(0);
   const [availableTags, setAvailableTags] = useState<string[]>(
     Array.from(new Set(initialTags)).sort((a, b) => a.localeCompare(b))
   );
@@ -229,15 +230,29 @@ export default function DashboardPage() {
       setLoading(true);
       setError(null);
       try {
-        const data = await getPrompts({
+        const trimmedQuery = query.trim();
+        const hasFilters = Boolean(trimmedQuery) || tags.length > 0;
+        const filteredData = await getPrompts({
           workspace: workspaceContext,
-          q: query || undefined,
+          q: trimmedQuery ? trimmedQuery : undefined,
           tags,
         });
         if (requestId !== requestRef.current) return;
-        const sorted = sortByUpdated(data);
+        const sorted = sortByUpdated(filteredData);
         setPrompts(sorted);
         setAvailableTags(buildAvailableTags(sorted, tags));
+        if (!hasFilters) {
+          setTotalPromptCount(sorted.length);
+        } else {
+          try {
+            const totalData = await getPrompts({ workspace: workspaceContext });
+            if (requestId !== requestRef.current) return;
+            setTotalPromptCount(totalData.length);
+          } catch {
+            if (requestId !== requestRef.current) return;
+            setTotalPromptCount(sorted.length);
+          }
+        }
       } catch (err) {
         if (requestId !== requestRef.current) return;
         setError(
@@ -286,8 +301,9 @@ export default function DashboardPage() {
 
   const handlePromptCreated = useCallback(
     (prompt: PromptWithTags) => {
+      const matchesWorkspace = promptMatchesWorkspaceSelection(prompt);
       setPrompts((current) => {
-        if (!promptMatchesWorkspaceSelection(prompt)) {
+        if (!matchesWorkspace) {
           return current;
         }
         const filtered = current.filter((item) => item.id !== prompt.id);
@@ -297,6 +313,9 @@ export default function DashboardPage() {
         setAvailableTags(buildAvailableTags(next, debouncedTags));
         return next;
       });
+      if (matchesWorkspace) {
+        setTotalPromptCount((count) => count + 1);
+      }
       setError(null);
     },
     [
@@ -342,12 +361,13 @@ export default function DashboardPage() {
         setAvailableTags(buildAvailableTags(next, debouncedTags));
         return next;
       });
+      setTotalPromptCount((count) => Math.max(0, count - 1));
     },
     [debouncedTags, buildAvailableTags]
   );
 
   const handleAddPrompt = () => {
-    if (prompts.length >= FREE_PLAN_PROMPT_LIMIT) {
+    if (totalPromptCount >= FREE_PLAN_PROMPT_LIMIT) {
       setUpgradeDialogOpen(true);
       return;
     }
@@ -446,6 +466,7 @@ export default function DashboardPage() {
           onPromptUpdated={handlePromptUpdated}
           onPromptDeleted={handlePromptDeleted}
           freePlanLimit={FREE_PLAN_PROMPT_LIMIT}
+          totalPromptCount={totalPromptCount}
           onRequestUpgrade={() => setUpgradeDialogOpen(true)}
           workspaceControl={workspaceSwitcherControl}
           contextControl={teamSelection}
@@ -462,7 +483,7 @@ export default function DashboardPage() {
       <UpgradePlanDialog
         open={upgradeDialogOpen}
         onOpenChange={setUpgradeDialogOpen}
-        currentUsage={prompts.length}
+        currentUsage={totalPromptCount}
         usageLimit={FREE_PLAN_PROMPT_LIMIT}
       />
     </main>

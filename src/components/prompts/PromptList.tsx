@@ -24,6 +24,7 @@ type PromptListProps = {
   onPromptUpdated: (prompt: PromptWithTags) => void | Promise<void>;
   onPromptDeleted: (promptId: string) => void | Promise<void>;
   freePlanLimit?: number;
+  totalPromptCount?: number;
   onRequestUpgrade: () => void;
   workspaceControl?: ReactNode;
   contextControl?: ReactNode;
@@ -159,6 +160,7 @@ export function PromptList({
   onPromptUpdated,
   onPromptDeleted,
   freePlanLimit,
+  totalPromptCount,
   onRequestUpgrade,
   workspaceControl,
   contextControl,
@@ -193,7 +195,7 @@ export function PromptList({
   const showSkeletonGrid = loading && prompts.length === 0;
 
   const limit = freePlanLimit ?? 0;
-  const promptCount = prompts.length;
+  const promptCount = totalPromptCount ?? prompts.length;
   const isOverLimit = limit > 0 && promptCount >= limit;
   const remaining = limit > 0 ? Math.max(limit - promptCount, 0) : 0;
   const usageProgress =
@@ -230,6 +232,7 @@ export function PromptList({
               // className={addPromptClasses}
               disabled={addPromptDisabled}
               title={addPromptDisabled ? addPromptDisabledReason : undefined}
+              className={addPromptClasses}
               aria-haspopup="dialog"
               aria-label={addPromptLabel}
               aria-disabled={isOverLimit}
@@ -258,6 +261,8 @@ export function PromptList({
                     : `You have ${remaining} prompt${
                         remaining === 1 ? "" : "s"
                       } left before hitting the limit.`}
+                  : `You have ${remaining} prompt${remaining === 1 ? "" : "s"}{" "}
+                  left before hitting the limit.`
                 </p>
               </div>
               <button
