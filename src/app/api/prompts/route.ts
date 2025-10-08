@@ -1,3 +1,6 @@
+import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
+
 import { prisma } from "@/lib/prisma";
 import {
   formatValidationError,
@@ -6,45 +9,41 @@ import {
   normalizeTags,
   promptCreationSchema,
 } from "@/lib/prompt-validation";
-import { Prisma } from "@prisma/client";
-import { NextResponse } from "next/server";
 import { getSessionOrDev } from "@/lib/session";
 
 export async function GET(req: Request) {
-  // NOTE: 開発時のみコメントアウト。本番ではこっちを使う。
-  // const session = await auth();
-  // if (!session?.user) {
-  //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  // }
-  // NOTE: 開発時のみ。
   const session = await getSessionOrDev();
-  if (!session?.user)
+  if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { searchParams } = new URL(req.url);
-  const workspaceParam = searchParams.get("workspace");
-  const workspace = workspaceParam === "team" ? "team" : "personal";
-  const teamId = searchParams.get("teamId") ?? undefined;
   const q = searchParams.get("q") ?? undefined;
   const tagParams = searchParams.getAll("tag");
   const normalizedTags = tagParams
     .map((value) => normalizeTagName(value))
-    .filter((value, index, array) => value && array.indexOf(value) === index) as string[];
+    .filter(
+      (value, index, array): value is string =>
+        Boolean(value) && array.indexOf(value) === index
+    );
+  const teamId = searchParams.get("teamId") ?? undefined;
 
   const filters: Prisma.PromptWhereInput[] = [
     { archivedAt: null },
-    workspace === "personal"
+    teamId
       ? {
-          ownerId: session.user.id,
-          owner: { deletedAt: null },
-        }
-      : {
           team: {
             deletedAt: null,
+            id: teamId,
             members: {
               some: { userId: session.user.id },
             },
-            ...(teamId ? { id: teamId } : {}),
           },
+        }
+      : {
+          ownerId: session.user.id,
+          owner: { deletedAt: null },
+          teamId: null,
         },
   ];
 
@@ -93,15 +92,10 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  // NOTE: 開発時のみコメントアウト。本番ではこっちを使う。
-  // const session = await auth();
-  // if (!session?.user) {
-  //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  // }
-  // NOTE: 開発時のみ。
   const session = await getSessionOrDev();
-  if (!session?.user)
+  if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   let payload: unknown;
   try {
@@ -125,18 +119,12 @@ export async function POST(req: Request) {
   }
 
   const data = parsed.data;
-  const variables = data.variables ?? {};
-  const normalizedTags = normalizeTags(data.tags);
-  const logging = data.logging ?? false;
   const teamId = typeof data.teamId === "string" ? data.teamId : undefined;
-  const notes = typeof data.notes === "string" && data.notes.trim() ? data.notes.trim() : null;
 
-  const isTeamPrompt = Boolean(teamId);
-
-  if (isTeamPrompt) {
+  if (teamId) {
     const membership = await prisma.teamMember.findFirst({
       where: {
-        teamId: teamId!,
+        teamId,
         userId: session.user.id,
       },
     });
@@ -146,6 +134,12 @@ export async function POST(req: Request) {
     }
   }
 
+  const normalizedTags = normalizeTags(data.tags);
+  const variables = data.variables ?? {};
+  const logging = data.logging ?? false;
+  const notes =
+    typeof data.notes === "string" && data.notes.trim() ? data.notes.trim() : null;
+
   const prompt = await prisma.prompt.create({
     data: {
       title: data.title,
@@ -153,8 +147,8 @@ export async function POST(req: Request) {
       variables,
       logging,
       notes,
-      ownerId: isTeamPrompt ? null : session.user.id,
-      teamId: isTeamPrompt ? teamId! : null,
+      ownerId: teamId ? null : session.user.id,
+      teamId: teamId ?? null,
       createdById: session.user.id,
       tags: normalizedTags.length
         ? {

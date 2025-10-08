@@ -22,6 +22,13 @@ enum TeamRole {
   admin
 }
 
+enum TeamInviteStatus {
+  pending
+  accepted
+  revoked
+  expired
+}
+
 model User {
   id              String          @id @default(cuid())
   name            String?
@@ -37,6 +44,7 @@ model User {
   createdPrompts  Prompt[]        @relation("CreatedBy")
   teamMemberships TeamMember[]
   ownedTeams      Team[]          @relation("TeamOwner")
+  sentTeamInvites TeamInvite[]    @relation("TeamInviteInvitedBy")
   runLogs         RunLog[]
   PromptComment   PromptComment[]
 }
@@ -80,13 +88,16 @@ model VerificationToken {
 model Team {
   id        String       @id @default(cuid())
   name      String
+  description String?
   ownerId   String?
+  inviteCode String?     @unique
   deletedAt DateTime?
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
   owner     User?        @relation("TeamOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   members   TeamMember[]
   prompts   Prompt[]     @relation("PromptTeam")
+  invites   TeamInvite[]
 }
 
 model TeamMember {
@@ -102,6 +113,28 @@ model TeamMember {
 
   @@unique([teamId, userId])
   @@index([userId])
+}
+
+model TeamInvite {
+  id           String           @id @default(cuid())
+  teamId       String
+  invitedById  String
+  email        String?
+  role         TeamRole         @default(member)
+  status       TeamInviteStatus @default(pending)
+  token        String           @unique
+  expiresAt    DateTime?
+  sentAt       DateTime?
+  acceptedAt   DateTime?
+  revokedAt    DateTime?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  team      Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  invitedBy User @relation("TeamInviteInvitedBy", fields: [invitedById], references: [id], onDelete: Cascade)
+
+  @@index([teamId])
+  @@index([email])
 }
 
 model Prompt {

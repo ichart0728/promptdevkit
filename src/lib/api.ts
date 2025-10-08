@@ -1,6 +1,11 @@
 import { PromptComment, PromptVersion, PromptWithTags } from "@/types/prompt";
-import { TeamSummary } from "@/types/team";
-import { WorkspaceContext, isTeamWorkspace } from "@/types/workspace";
+import {
+  TeamDetail,
+  TeamInviteSummary,
+  TeamMemberWithUser,
+  TeamRole,
+  TeamSummary,
+} from "@/types/team";
 
 type FetchError = Error & { status?: number };
 
@@ -25,34 +30,26 @@ const buildError = async (res: Response): Promise<FetchError> => {
   return err;
 };
 
-const applyWorkspaceParams = (
-  params: URLSearchParams,
-  workspace: WorkspaceContext
-) => {
-  params.set("workspace", workspace.type);
-  if (isTeamWorkspace(workspace) && workspace.teamId) {
-    params.set("teamId", workspace.teamId);
-  }
-};
-
 type GetPromptsParams = {
-  workspace: WorkspaceContext;
   q?: string;
   tags?: string[];
+  teamId?: string | null;
 };
 
 export async function getPrompts({
-  workspace,
   q,
   tags = [],
-}: GetPromptsParams): Promise<PromptWithTags[]> {
+  teamId,
+}: GetPromptsParams = {}): Promise<PromptWithTags[]> {
   const params = new URLSearchParams();
-  applyWorkspaceParams(params, workspace);
   if (q) params.set("q", q);
   if (tags.length) {
     tags.forEach((tag) => {
       if (tag) params.append("tag", tag);
     });
+  }
+  if (teamId) {
+    params.set("teamId", teamId);
   }
   const search = params.toString();
   const url = `/api/prompts${search ? `?${search}` : ""}`;
@@ -89,6 +86,7 @@ type UpdatePromptPayload = {
   tags?: string[];
   notes?: string;
   removedTags?: string[];
+  teamId?: string | null;
 };
 
 export async function updatePrompt(id: string, payload: UpdatePromptPayload): Promise<PromptWithTags> {
@@ -110,12 +108,17 @@ export async function deletePrompt(id: string): Promise<void> {
   }
 }
 
-export async function getPromptVersions(
-  promptId: string,
-  workspace: WorkspaceContext
-): Promise<PromptVersion[]> {
+type GetPromptVersionsParams = {
+  promptId: string;
+  teamId?: string | null;
+};
+
+export async function getPromptVersions({
+  promptId,
+  teamId,
+}: GetPromptVersionsParams): Promise<PromptVersion[]> {
   const params = new URLSearchParams();
-  applyWorkspaceParams(params, workspace);
+  if (teamId) params.set("teamId", teamId);
   const search = params.toString();
   const res = await fetch(
     `/api/prompts/${promptId}/versions${search ? `?${search}` : ""}`,
@@ -127,19 +130,23 @@ export async function getPromptVersions(
   return res.json();
 }
 
-export async function deletePromptVersion(
-  promptId: string,
-  versionId: string,
-  workspace: WorkspaceContext
-): Promise<void> {
+type DeletePromptVersionParams = {
+  promptId: string;
+  versionId: string;
+  teamId?: string | null;
+};
+
+export async function deletePromptVersion({
+  promptId,
+  versionId,
+  teamId,
+}: DeletePromptVersionParams): Promise<void> {
   const params = new URLSearchParams();
-  applyWorkspaceParams(params, workspace);
+  if (teamId) params.set("teamId", teamId);
   const search = params.toString();
   const res = await fetch(
     `/api/prompts/${promptId}/versions/${versionId}${search ? `?${search}` : ""}`,
-    {
-      method: "DELETE",
-    }
+    { method: "DELETE" }
   );
   if (!res.ok) {
     throw await buildError(res);
@@ -149,14 +156,15 @@ export async function deletePromptVersion(
 type CreatePromptCommentPayload = {
   body: string;
   parentId?: string | null;
+  teamId?: string | null;
 };
 
 export async function getPromptComments(
   promptId: string,
-  workspace: WorkspaceContext
+  teamId?: string | null
 ): Promise<PromptComment[]> {
   const params = new URLSearchParams();
-  applyWorkspaceParams(params, workspace);
+  if (teamId) params.set("teamId", teamId);
   const search = params.toString();
   const res = await fetch(
     `/api/prompts/${promptId}/comments${search ? `?${search}` : ""}`,
@@ -170,13 +178,43 @@ export async function getPromptComments(
 
 export async function createPromptComment(
   promptId: string,
-  workspace: WorkspaceContext,
   payload: CreatePromptCommentPayload
 ): Promise<PromptComment> {
+  const { teamId, ...rest } = payload;
   const params = new URLSearchParams();
-  applyWorkspaceParams(params, workspace);
+  if (teamId) params.set("teamId", teamId);
   const search = params.toString();
-  const res = await fetch(`/api/prompts/${promptId}/comments${search ? `?${search}` : ""}`, {
+  const res = await fetch(
+    `/api/prompts/${promptId}/comments${search ? `?${search}` : ""}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(rest),
+    }
+  );
+  if (!res.ok) {
+    throw await buildError(res);
+  }
+  return res.json();
+}
+
+// Team API helpers ---------------------------------------------------------
+
+type CreateTeamPayload = {
+  name: string;
+  description?: string;
+};
+
+export async function getTeams(): Promise<TeamSummary[]> {
+  const res = await fetch(`/api/teams`, { method: "GET" });
+  if (!res.ok) {
+    throw await buildError(res);
+  }
+  return res.json();
+}
+
+export async function createTeam(payload: CreateTeamPayload): Promise<TeamSummary> {
+  const res = await fetch(`/api/teams`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -187,8 +225,145 @@ export async function createPromptComment(
   return res.json();
 }
 
-export async function getTeams(): Promise<TeamSummary[]> {
-  const res = await fetch(`/api/teams`, { method: "GET" });
+type InviteTeamMemberPayload = {
+  email: string;
+  role?: TeamRole;
+};
+
+export async function inviteTeamMember(
+  teamId: string,
+  payload: InviteTeamMemberPayload
+): Promise<TeamInviteSummary> {
+  const res = await fetch(`/api/teams/${teamId}/members`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    throw await buildError(res);
+  }
+  return res.json();
+}
+
+export async function getTeam(teamId: string): Promise<TeamDetail> {
+  const res = await fetch(`/api/teams/${teamId}`, { method: "GET" });
+  if (!res.ok) {
+    throw await buildError(res);
+  }
+  return res.json();
+}
+
+type UpdateTeamPayload = {
+  name?: string;
+  description?: string | null;
+};
+
+export async function updateTeam(
+  teamId: string,
+  payload: UpdateTeamPayload
+): Promise<TeamDetail> {
+  const res = await fetch(`/api/teams/${teamId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    throw await buildError(res);
+  }
+  return res.json();
+}
+
+export async function deleteTeam(teamId: string): Promise<void> {
+  const res = await fetch(`/api/teams/${teamId}`, { method: "DELETE" });
+  if (!res.ok && res.status !== 204) {
+    throw await buildError(res);
+  }
+}
+
+export async function updateTeamMemberRole(
+  teamId: string,
+  memberId: string,
+  role: TeamRole
+): Promise<TeamMemberWithUser> {
+  const res = await fetch(`/api/teams/${teamId}/members/${memberId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ role }),
+  });
+  if (!res.ok) {
+    throw await buildError(res);
+  }
+  return res.json();
+}
+
+export async function removeTeamMember(
+  teamId: string,
+  memberId: string
+): Promise<void> {
+  const res = await fetch(`/api/teams/${teamId}/members/${memberId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    throw await buildError(res);
+  }
+}
+
+export async function leaveTeam(teamId: string): Promise<void> {
+  const res = await fetch(`/api/teams/${teamId}/leave`, { method: "POST" });
+  if (!res.ok) {
+    throw await buildError(res);
+  }
+}
+
+export async function generateTeamInviteLink(teamId: string): Promise<{ token: string }> {
+  const res = await fetch(`/api/teams/${teamId}/invite-link`, { method: "POST" });
+  if (!res.ok) {
+    throw await buildError(res);
+  }
+  return res.json();
+}
+
+type TransferTeamOwnershipPayload = {
+  newOwnerId: string;
+};
+
+export async function transferTeamOwnership(
+  teamId: string,
+  payload: TransferTeamOwnershipPayload
+): Promise<TeamDetail> {
+  const res = await fetch(`/api/teams/${teamId}/transfer`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    throw await buildError(res);
+  }
+  return res.json();
+}
+
+export async function getTeamInvites(teamId: string): Promise<TeamInviteSummary[]> {
+  const res = await fetch(`/api/teams/${teamId}/invites`, { method: "GET" });
+  if (!res.ok) {
+    throw await buildError(res);
+  }
+  return res.json();
+}
+
+export async function revokeTeamInvite(
+  teamId: string,
+  inviteId: string
+): Promise<void> {
+  const res = await fetch(`/api/teams/${teamId}/invites/${inviteId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    throw await buildError(res);
+  }
+}
+
+export async function acceptTeamInvite(token: string): Promise<TeamDetail> {
+  const res = await fetch(`/api/teams/invites/${token}`, { method: "POST" });
   if (!res.ok) {
     throw await buildError(res);
   }
