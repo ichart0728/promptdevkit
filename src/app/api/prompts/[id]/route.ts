@@ -56,8 +56,9 @@ export async function PATCH(req: Request, { params }: Params) {
     where: buildAccessFilter(params.id, session.user.id),
     include: {
       tags: { include: { tag: true } },
-      team: true,
-      owner: true,
+      team: { select: { id: true, name: true } },
+      owner: { select: { id: true, name: true, email: true } },
+      createdBy: { select: { id: true, name: true, email: true } },
     },
   });
 
@@ -126,6 +127,7 @@ export async function PATCH(req: Request, { params }: Params) {
         title: prompt.title,
         body: prompt.body,
         variables: prompt.variables,
+        createdById: session.user.id,
       },
     });
 
@@ -156,12 +158,16 @@ export async function PATCH(req: Request, { params }: Params) {
       },
       include: {
         tags: { include: { tag: true } },
-        team: true,
-        owner: true,
+        team: { select: { id: true, name: true } },
+        owner: { select: { id: true, name: true, email: true } },
+        createdBy: { select: { id: true, name: true, email: true } },
+        _count: { select: { comments: true } },
       },
     });
 
-    return updated;
+    const { _count, ...promptData } = updated;
+
+    return { ...promptData, commentCount: _count.comments };
   });
 
   return NextResponse.json(result);

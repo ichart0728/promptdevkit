@@ -1,5 +1,11 @@
 export type Tag = { id: string; name: string };
 export type TagOnPrompt = { tag: Tag };
+export type PromptUser = {
+  id: string;
+  name: string | null;
+  email: string | null;
+};
+export type PromptTeam = { id: string; name: string };
 export type Prompt = {
   id: string;
   title: string;
@@ -12,7 +18,13 @@ export type Prompt = {
   updatedAt: string;
   notes?: string | null;
 };
-export type PromptWithTags = Prompt & { tags: TagOnPrompt[]; commentCount?: number };
+export type PromptWithTags = Prompt & {
+  tags: TagOnPrompt[];
+  commentCount?: number;
+  owner?: PromptUser | null;
+  createdBy?: PromptUser | null;
+  team?: PromptTeam | null;
+};
 
 export type PromptComment = {
   id: string;
@@ -35,4 +47,6 @@ export type PromptVersion = {
   body: string;
   variables: Record<string, unknown> | null;
   createdAt: string;
+  createdById?: string | null;
+  createdBy?: PromptUser | null;
 };

@@ -21,28 +21,31 @@ export async function GET(req: Request) {
   if (!session?.user)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { searchParams } = new URL(req.url);
+  const workspaceParam = searchParams.get("workspace");
+  const workspace = workspaceParam === "team" ? "team" : "personal";
+  const teamId = searchParams.get("teamId") ?? undefined;
   const q = searchParams.get("q") ?? undefined;
-  const tag = searchParams.get("tag") ?? undefined;
-  const normalizedTag = tag ? normalizeTagName(tag) : undefined;
+  const tagParams = searchParams.getAll("tag");
+  const normalizedTags = tagParams
+    .map((value) => normalizeTagName(value))
+    .filter((value, index, array) => value && array.indexOf(value) === index) as string[];
 
   const filters: Prisma.PromptWhereInput[] = [
     { archivedAt: null },
-    {
-      OR: [
-        {
+    workspace === "personal"
+      ? {
           ownerId: session.user.id,
           owner: { deletedAt: null },
-        },
-        {
+        }
+      : {
           team: {
             deletedAt: null,
             members: {
               some: { userId: session.user.id },
             },
+            ...(teamId ? { id: teamId } : {}),
           },
         },
-      ],
-    },
   ];
 
   if (q) {
@@ -55,15 +58,17 @@ export async function GET(req: Request) {
     });
   }
 
-  if (normalizedTag) {
+  if (normalizedTags.length) {
     filters.push({
-      tags: {
-        some: {
-          tag: {
-            name: normalizedTag,
+      AND: normalizedTags.map((tag) => ({
+        tags: {
+          some: {
+            tag: {
+              name: tag,
+            },
           },
         },
-      },
+      })),
     });
   }
 
@@ -72,12 +77,19 @@ export async function GET(req: Request) {
     orderBy: { updatedAt: "desc" },
     include: {
       tags: { include: { tag: true } },
-      team: true,
-      owner: true,
+      team: { select: { id: true, name: true } },
+      owner: { select: { id: true, name: true, email: true } },
+      createdBy: { select: { id: true, name: true, email: true } },
+      _count: { select: { comments: true } },
     },
   });
 
-  return NextResponse.json(prompts);
+  const serialized = prompts.map(({ _count, ...prompt }) => ({
+    ...prompt,
+    commentCount: _count.comments,
+  }));
+
+  return NextResponse.json(serialized);
 }
 
 export async function POST(req: Request) {
@@ -159,10 +171,20 @@ export async function POST(req: Request) {
     },
     include: {
       tags: { include: { tag: true } },
-      team: true,
-      owner: true,
+      team: { select: { id: true, name: true } },
+      owner: { select: { id: true, name: true, email: true } },
+      createdBy: { select: { id: true, name: true, email: true } },
+      _count: { select: { comments: true } },
     },
   });
 
-  return NextResponse.json(prompt, { status: 201 });
+  const { _count, ...promptData } = prompt;
+
+  return NextResponse.json(
+    {
+      ...promptData,
+      commentCount: _count.comments,
+    },
+    { status: 201 }
+  );
 }

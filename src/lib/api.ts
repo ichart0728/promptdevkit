@@ -1,4 +1,6 @@
 import { PromptComment, PromptVersion, PromptWithTags } from "@/types/prompt";
+import { TeamSummary } from "@/types/team";
+import { WorkspaceContext, isTeamWorkspace } from "@/types/workspace";
 
 type FetchError = Error & { status?: number };
 
@@ -23,11 +25,29 @@ const buildError = async (res: Response): Promise<FetchError> => {
   return err;
 };
 
-export async function getPrompts(
-  q?: string,
-  tags: string[] = []
-): Promise<PromptWithTags[]> {
+const applyWorkspaceParams = (
+  params: URLSearchParams,
+  workspace: WorkspaceContext
+) => {
+  params.set("workspace", workspace.type);
+  if (isTeamWorkspace(workspace) && workspace.teamId) {
+    params.set("teamId", workspace.teamId);
+  }
+};
+
+type GetPromptsParams = {
+  workspace: WorkspaceContext;
+  q?: string;
+  tags?: string[];
+};
+
+export async function getPrompts({
+  workspace,
+  q,
+  tags = [],
+}: GetPromptsParams): Promise<PromptWithTags[]> {
   const params = new URLSearchParams();
+  applyWorkspaceParams(params, workspace);
   if (q) params.set("q", q);
   if (tags.length) {
     tags.forEach((tag) => {
@@ -48,6 +68,7 @@ type CreatePromptPayload = {
   body: string;
   tags?: string[];
   notes?: string;
+  teamId?: string;
 };
 
 export async function createPrompt(payload: CreatePromptPayload): Promise<PromptWithTags> {
@@ -89,18 +110,37 @@ export async function deletePrompt(id: string): Promise<void> {
   }
 }
 
-export async function getPromptVersions(promptId: string): Promise<PromptVersion[]> {
-  const res = await fetch(`/api/prompts/${promptId}/versions`, { method: "GET" });
+export async function getPromptVersions(
+  promptId: string,
+  workspace: WorkspaceContext
+): Promise<PromptVersion[]> {
+  const params = new URLSearchParams();
+  applyWorkspaceParams(params, workspace);
+  const search = params.toString();
+  const res = await fetch(
+    `/api/prompts/${promptId}/versions${search ? `?${search}` : ""}`,
+    { method: "GET" }
+  );
   if (!res.ok) {
     throw await buildError(res);
   }
   return res.json();
 }
 
-export async function deletePromptVersion(promptId: string, versionId: string): Promise<void> {
-  const res = await fetch(`/api/prompts/${promptId}/versions/${versionId}`, {
-    method: "DELETE",
-  });
+export async function deletePromptVersion(
+  promptId: string,
+  versionId: string,
+  workspace: WorkspaceContext
+): Promise<void> {
+  const params = new URLSearchParams();
+  applyWorkspaceParams(params, workspace);
+  const search = params.toString();
+  const res = await fetch(
+    `/api/prompts/${promptId}/versions/${versionId}${search ? `?${search}` : ""}`,
+    {
+      method: "DELETE",
+    }
+  );
   if (!res.ok) {
     throw await buildError(res);
   }
@@ -111,8 +151,17 @@ type CreatePromptCommentPayload = {
   parentId?: string | null;
 };
 
-export async function getPromptComments(promptId: string): Promise<PromptComment[]> {
-  const res = await fetch(`/api/prompts/${promptId}/comments`, { method: "GET" });
+export async function getPromptComments(
+  promptId: string,
+  workspace: WorkspaceContext
+): Promise<PromptComment[]> {
+  const params = new URLSearchParams();
+  applyWorkspaceParams(params, workspace);
+  const search = params.toString();
+  const res = await fetch(
+    `/api/prompts/${promptId}/comments${search ? `?${search}` : ""}`,
+    { method: "GET" }
+  );
   if (!res.ok) {
     throw await buildError(res);
   }
@@ -121,13 +170,25 @@ export async function getPromptComments(promptId: string): Promise<PromptComment
 
 export async function createPromptComment(
   promptId: string,
+  workspace: WorkspaceContext,
   payload: CreatePromptCommentPayload
 ): Promise<PromptComment> {
-  const res = await fetch(`/api/prompts/${promptId}/comments`, {
+  const params = new URLSearchParams();
+  applyWorkspaceParams(params, workspace);
+  const search = params.toString();
+  const res = await fetch(`/api/prompts/${promptId}/comments${search ? `?${search}` : ""}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
+  if (!res.ok) {
+    throw await buildError(res);
+  }
+  return res.json();
+}
+
+export async function getTeams(): Promise<TeamSummary[]> {
+  const res = await fetch(`/api/teams`, { method: "GET" });
   if (!res.ok) {
     throw await buildError(res);
   }

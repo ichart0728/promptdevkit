@@ -9,6 +9,52 @@ const commentSchema = z.object({
   parentId: z.string().cuid().optional().nullable(),
 });
 
+type WorkspaceParams = {
+  workspace: "personal" | "team";
+  teamId?: string;
+};
+
+type SerializedComment = {
+  id: string;
+  promptId: string;
+  parentId: string | null;
+  body: string;
+  createdAt: string;
+  updatedAt: string;
+  authorId: string | null;
+  authorName: string | null;
+  authorEmail: string | null;
+  replies: SerializedComment[];
+};
+
+const parseWorkspace = (req: Request): WorkspaceParams => {
+  const { searchParams } = new URL(req.url);
+  const workspaceParam = searchParams.get("workspace");
+  const workspace = workspaceParam === "team" ? "team" : "personal";
+  const teamId = searchParams.get("teamId") ?? undefined;
+  return { workspace, teamId };
+};
+
+const promptMatchesWorkspace = (
+  prompt: { ownerId: string | null; teamId: string | null },
+  userId: string,
+  { workspace, teamId }: WorkspaceParams
+) => {
+  if (workspace === "personal") {
+    return prompt.ownerId === userId;
+  }
+
+  if (!prompt.teamId) {
+    return false;
+  }
+
+  if (teamId && prompt.teamId !== teamId) {
+    return false;
+  }
+
+  return true;
+};
+
 const buildAccessFilter = (promptId: string, userId: string) => ({
   id: promptId,
   archivedAt: null,
@@ -40,12 +86,12 @@ const serializeComments = (
       author?: { id: string; name: string | null; email: string | null } | null;
     }
   >
-) => {
-  const map = new Map<string, any>();
-  const roots: any[] = [];
+): SerializedComment[] => {
+  const map = new Map<string, SerializedComment>();
+  const roots: SerializedComment[] = [];
 
   comments.forEach((comment) => {
-    map.set(comment.id, {
+    const node: SerializedComment = {
       id: comment.id,
       promptId: comment.promptId,
       parentId: comment.parentId,
@@ -55,21 +101,28 @@ const serializeComments = (
       authorId: comment.author?.id ?? null,
       authorName: comment.author?.name ?? null,
       authorEmail: comment.author?.email ?? null,
-      replies: [] as any[],
-    });
+      replies: [],
+    };
+    map.set(comment.id, node);
   });
 
   comments.forEach((comment) => {
     const node = map.get(comment.id);
-    if (comment.parentId && map.has(comment.parentId)) {
-      map.get(comment.parentId).replies.push(node);
-    } else {
-      roots.push(node);
+    if (!node) return;
+    if (comment.parentId) {
+      const parentNode = map.get(comment.parentId);
+      if (parentNode) {
+        parentNode.replies.push(node);
+        return;
+      }
     }
+    roots.push(node);
   });
 
-  const sortReplies = (nodes: any[]) => {
-    nodes.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  const sortReplies = (nodes: SerializedComment[]) => {
+    nodes.sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
     nodes.forEach((node) => sortReplies(node.replies));
   };
 
@@ -82,18 +135,20 @@ function serializeZodError(error: z.ZodError) {
   return flattened.formErrors.join("\n") || Object.values(flattened.fieldErrors).flat().join("\n");
 }
 
-export async function GET(_: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, { params }: { params: { id: string } }) {
   const session = await getSessionOrDev();
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const workspace = parseWorkspace(req);
+
   const prompt = await prisma.prompt.findFirst({
     where: buildAccessFilter(params.id, session.user.id),
-    select: { id: true },
+    select: { id: true, ownerId: true, teamId: true },
   });
 
-  if (!prompt) {
+  if (!prompt || !promptMatchesWorkspace(prompt, session.user.id, workspace)) {
     return NextResponse.json({ error: "Not Found" }, { status: 404 });
   }
 
@@ -114,10 +169,12 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const workspace = parseWorkspace(req);
+
   let payload: unknown;
   try {
     payload = await req.json();
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
@@ -128,10 +185,10 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   const prompt = await prisma.prompt.findFirst({
     where: buildAccessFilter(params.id, session.user.id),
-    select: { id: true },
+    select: { id: true, ownerId: true, teamId: true },
   });
 
-  if (!prompt) {
+  if (!prompt || !promptMatchesWorkspace(prompt, session.user.id, workspace)) {
     return NextResponse.json({ error: "Not Found" }, { status: 404 });
   }
 

@@ -1,4 +1,3 @@
-import { auth } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
 import {
   formatValidationError,

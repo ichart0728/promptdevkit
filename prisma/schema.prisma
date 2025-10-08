@@ -138,9 +138,11 @@ model PromptVersion {
   title     String
   body      String
   variables Json
+  createdById String?
   createdAt DateTime @default(now())
 
   prompt Prompt @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  createdBy User?  @relation(fields: [createdById], references: [id], onDelete: SetNull)
 
   @@unique([promptId, version])
 }

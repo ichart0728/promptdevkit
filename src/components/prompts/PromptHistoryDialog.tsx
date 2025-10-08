@@ -6,6 +6,7 @@ import type { ReactNode, UIEvent } from "react";
 import { deletePromptVersion, getPromptVersions } from "@/lib/api";
 import { formatUpdatedAt } from "@/lib/format";
 import { PromptVersion, PromptWithTags } from "@/types/prompt";
+import { WorkspaceContext, isTeamWorkspace } from "@/types/workspace";
 
 const focusableSelector =
   "a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex='-1'])";
@@ -32,6 +33,7 @@ type PromptHistoryDialogProps = {
   prompt: PromptWithTags;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  workspace: WorkspaceContext;
 };
 
 type SplitDiffRow = {
@@ -128,6 +130,7 @@ export function PromptHistoryDialog({
   prompt,
   open,
   onOpenChange,
+  workspace,
 }: PromptHistoryDialogProps) {
   const [versions, setVersions] = useState<PromptVersion[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -141,6 +144,11 @@ export function PromptHistoryDialog({
 
   const [panelHeight, setPanelHeight] = useState(400);
   const [pastScrollTop, setPastScrollTop] = useState(0);
+  const isTeamPrompt = isTeamWorkspace(workspace);
+
+  const getAuthorLabel = useCallback((user: PromptVersion["createdBy"]) => {
+    return user?.name ?? user?.email ?? "Unknown member";
+  }, []);
 
   const handleClose = useCallback(() => {
     onOpenChange(false);
@@ -210,7 +218,7 @@ export function PromptHistoryDialog({
     setError(null);
     setDeletingId(null);
 
-    getPromptVersions(prompt.id)
+    getPromptVersions(prompt.id, workspace)
       .then((data) => {
         if (!isMounted) return;
         setVersions(data);
@@ -233,12 +241,12 @@ export function PromptHistoryDialog({
     return () => {
       isMounted = false;
     };
-  }, [open, prompt.id]);
+  }, [open, prompt.id, workspace]);
 
   const handleDeleteVersion = async (versionId: string) => {
     setDeletingId(versionId);
     try {
-      await deletePromptVersion(prompt.id, versionId);
+      await deletePromptVersion(prompt.id, versionId, workspace);
       setVersions((current) => {
         const next = current.filter((version) => version.id !== versionId);
         setSelectedId((selected) =>
@@ -447,6 +455,8 @@ export function PromptHistoryDialog({
                     ) : (
                       versions.map((version) => {
                         const isActive = version.id === selectedId;
+                        const authorLabel = getAuthorLabel(version.createdBy);
+                        const savedLabel = formatUpdatedAt(version.createdAt);
                         return (
                           <div
                             key={version.id}
@@ -474,7 +484,9 @@ export function PromptHistoryDialog({
                               </button>
                             </div>
                             <span className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                              Saved {formatUpdatedAt(version.createdAt)}
+                              {isTeamPrompt
+                                ? `Saved by ${authorLabel} · ${savedLabel}`
+                                : `Saved ${savedLabel}`}
                             </span>
                             <p
                               className="mt-2 text-xs text-slate-600 dark:text-slate-300"
@@ -501,8 +513,12 @@ export function PromptHistoryDialog({
                         Past version
                       </h3>
                       {selectedVersion ? (
-                        <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                          Saved {formatUpdatedAt(selectedVersion.createdAt)}
+                        <span className="flex flex-col text-right text-xs font-medium text-slate-500 dark:text-slate-400">
+                          <span>
+                            {isTeamPrompt
+                              ? `Saved by ${getAuthorLabel(selectedVersion.createdBy)} · ${formatUpdatedAt(selectedVersion.createdAt)}`
+                              : `Saved ${formatUpdatedAt(selectedVersion.createdAt)}`}
+                          </span>
                         </span>
                       ) : null}
                     </div>

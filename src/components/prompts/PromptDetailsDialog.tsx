@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import { formatUpdatedAt } from "@/lib/format";
 import { PromptWithTags } from "@/types/prompt";
+import { WorkspaceContext, isTeamWorkspace } from "@/types/workspace";
 
 const focusableSelector =
   "a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex='-1'])";
@@ -23,33 +24,19 @@ const CloseIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-const CommentIcon = ({ className }: { className?: string }) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.5"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M7 8h10" />
-    <path d="M7 12h6" />
-    <path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2Z" />
-  </svg>
-);
-
 type PromptDetailsDialogProps = {
   prompt: PromptWithTags;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onOpenComments?: () => void;
+  workspace: WorkspaceContext;
 };
 
 export function PromptDetailsDialog({
   prompt,
   open,
   onOpenChange,
+  workspace,
 }: PromptDetailsDialogProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const lastActiveElement = useRef<HTMLElement | null>(null);
@@ -59,6 +46,12 @@ export function PromptDetailsDialog({
     () => formatUpdatedAt(prompt.updatedAt),
     [prompt.updatedAt]
   );
+  const isTeamPrompt = isTeamWorkspace(workspace);
+  const workspaceLabel = isTeamPrompt
+    ? prompt.team?.name
+      ? `チーム用 · ${prompt.team.name}`
+      : "チーム用"
+    : "個人用";
 
   const handleClose = useCallback(() => {
     onOpenChange(false);
@@ -165,7 +158,7 @@ export function PromptDetailsDialog({
         </header>
 
         <div className="flex flex-col gap-4 overflow-y-auto pr-1">
-          <section className="grid gap-4 sm:grid-cols-2">
+          <section className="grid gap-4 sm:grid-cols-3">
             <div className="rounded-xl border border-slate-200 bg-white/80 p-4 text-sm text-slate-600 transition dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
                 Last updated
@@ -180,6 +173,14 @@ export function PromptDetailsDialog({
               </p>
               <p className="mt-1 font-medium text-slate-800 dark:text-slate-100">
                 {commentCount}
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white/80 p-4 text-sm text-slate-600 transition dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                Workspace
+              </p>
+              <p className="mt-1 font-medium text-slate-800 dark:text-slate-100">
+                {workspaceLabel}
               </p>
             </div>
           </section>

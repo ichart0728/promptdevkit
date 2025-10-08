@@ -8,6 +8,39 @@ type Params = {
   params: { id: string; versionId: string };
 };
 
+type WorkspaceParams = {
+  workspace: "personal" | "team";
+  teamId?: string;
+};
+
+const parseWorkspace = (req: Request): WorkspaceParams => {
+  const { searchParams } = new URL(req.url);
+  const workspaceParam = searchParams.get("workspace");
+  const workspace = workspaceParam === "team" ? "team" : "personal";
+  const teamId = searchParams.get("teamId") ?? undefined;
+  return { workspace, teamId };
+};
+
+const promptMatchesWorkspace = (
+  prompt: { ownerId: string | null; teamId: string | null },
+  userId: string,
+  { workspace, teamId }: WorkspaceParams
+) => {
+  if (workspace === "personal") {
+    return prompt.ownerId === userId;
+  }
+
+  if (!prompt.teamId) {
+    return false;
+  }
+
+  if (teamId && prompt.teamId !== teamId) {
+    return false;
+  }
+
+  return true;
+};
+
 const buildAccessFilter = (promptId: string, userId: string): Prisma.PromptWhereInput => ({
   id: promptId,
   archivedAt: null,
@@ -39,15 +72,29 @@ export async function DELETE(req: Request, { params }: Params) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const workspace = parseWorkspace(req);
+
   const version = await prisma.promptVersion.findFirst({
     where: {
       id: params.versionId,
       promptId: params.id,
-      prompt: { is: buildAccessFilter(params.id, session.user.id) },
+      prompt: {
+        is: buildAccessFilter(params.id, session.user.id),
+        ownerId: workspace.workspace === "personal" ? session.user.id : undefined,
+        teamId:
+          workspace.workspace === "team"
+            ? workspace.teamId
+              ? workspace.teamId
+              : { not: null }
+            : undefined,
+      },
+    },
+    include: {
+      prompt: { select: { ownerId: true, teamId: true } },
     },
   });
 
-  if (!version) {
+  if (!version || !promptMatchesWorkspace(version.prompt, session.user.id, workspace)) {
     return NextResponse.json({ error: "Not Found" }, { status: 404 });
   }
 

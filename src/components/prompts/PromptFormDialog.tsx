@@ -43,21 +43,6 @@ const getFocusableElements = (container: HTMLElement) =>
     (element) => !element.hasAttribute("data-focus-guard")
   );
 
-const CloseIcon = ({ className }: { className?: string }) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.5"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="m6 6 12 12" />
-    <path d="m6 18 12-12" />
-  </svg>
-);
-
 const defaultValues: PromptFormValues = {
   title: "",
   body: "",

@@ -12,6 +12,7 @@ import {
 import { createPromptComment, getPromptComments } from "@/lib/api";
 import { formatUpdatedAt } from "@/lib/format";
 import { PromptComment, PromptWithTags } from "@/types/prompt";
+import { WorkspaceContext, isTeamWorkspace } from "@/types/workspace";
 
 const MAX_COMMENT_LENGTH = 2000;
 
@@ -20,6 +21,7 @@ type PromptCommentsDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCommentCountChange?: (count: number) => void;
+  workspace: WorkspaceContext;
 };
 
 type NewCommentState = {
@@ -56,6 +58,7 @@ export function PromptCommentsDialog({
   open,
   onOpenChange,
   onCommentCountChange,
+  workspace,
 }: PromptCommentsDialogProps) {
   const [comments, setComments] = useState<PromptComment[]>([]);
   const [loading, setLoading] = useState(false);
@@ -77,6 +80,10 @@ export function PromptCommentsDialog({
   }, [comments]);
 
   const sortedComments = useMemo(() => sortByCreatedAt(comments), [comments]);
+  const isTeamPrompt = isTeamWorkspace(workspace);
+  const headerDescription = isTeamPrompt
+    ? "Discuss this prompt with your teammates."
+    : "Capture personal notes or reminders for this prompt.";
 
   useEffect(() => {
     if (!open) {
@@ -91,7 +98,7 @@ export function PromptCommentsDialog({
     setLoading(true);
     setError(null);
 
-    getPromptComments(prompt.id)
+    getPromptComments(prompt.id, workspace)
       .then((data) => {
         if (!isMounted) return;
         const flattened = sortByCreatedAt(flattenComments(data));
@@ -109,7 +116,7 @@ export function PromptCommentsDialog({
     return () => {
       isMounted = false;
     };
-  }, [open, prompt.id, onCommentCountChange]);
+  }, [open, prompt.id, onCommentCountChange, workspace]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -117,10 +124,14 @@ export function PromptCommentsDialog({
     if (!trimmed) return;
     setSubmitting(true);
     try {
-      const created = await createPromptComment(prompt.id, {
-        body: trimmed,
-        parentId: newComment.parentId ?? undefined,
-      });
+      const created = await createPromptComment(
+        prompt.id,
+        workspace,
+        {
+          body: trimmed,
+          parentId: newComment.parentId ?? undefined,
+        }
+      );
       setComments((current) => {
         const next = sortByCreatedAt([...current, { ...created, replies: [] }]);
         onCommentCountChange?.(next.length);
@@ -203,7 +214,7 @@ export function PromptCommentsDialog({
               Comments
             </h2>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              Discuss this prompt with your teammates.
+              {headerDescription}
             </p>
           </div>
           <button

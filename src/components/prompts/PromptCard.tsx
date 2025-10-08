@@ -6,6 +6,7 @@ import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { deletePrompt } from "@/lib/api";
 import { formatUpdatedAt } from "@/lib/format";
 import { PromptWithTags } from "@/types/prompt";
+import { isTeamWorkspace } from "@/types/workspace";
 
 import { DeletePromptDialog } from "./DeletePromptDialog";
 import { EditPromptDialog } from "./EditPromptDialog";
@@ -66,6 +67,19 @@ export function PromptCard({ prompt, onUpdated, onDeleted }: PromptCardProps) {
   const commentCount = promptData.commentCount ?? 0;
   const notesContent = promptData.notes ?? "";
 
+  const workspace = promptData.teamId
+    ? ({ type: "team", teamId: promptData.teamId } as const)
+    : ({ type: "personal" } as const);
+  const isTeamPrompt = isTeamWorkspace(workspace);
+  const workspaceLabel = isTeamPrompt
+    ? promptData.team?.name
+      ? `チーム用 · ${promptData.team.name}`
+      : "チーム用"
+    : "個人用";
+  const workspaceBadgeClass = isTeamPrompt
+    ? "inline-flex items-center rounded-full bg-violet-500/15 px-3 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-violet-600 dark:bg-violet-500/20 dark:text-violet-200"
+    : "inline-flex items-center rounded-full bg-slate-200/70 px-3 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600 dark:bg-slate-800/70 dark:text-slate-300";
+
   const [isBodyOverflowing, setIsBodyOverflowing] = useState(false);
   const [isNotesOverflowing, setIsNotesOverflowing] = useState(false);
 
@@ -89,7 +103,7 @@ export function PromptCard({ prompt, onUpdated, onDeleted }: PromptCardProps) {
     const handleResize = () => update();
     window.addEventListener("resize", handleResize);
 
-    let raf = window.requestAnimationFrame(update);
+    const raf = window.requestAnimationFrame(update);
     let observer: ResizeObserver | undefined;
     if (typeof ResizeObserver !== "undefined") {
       observer = new ResizeObserver(() => update());
@@ -125,7 +139,7 @@ export function PromptCard({ prompt, onUpdated, onDeleted }: PromptCardProps) {
     const handleResize = () => update();
     window.addEventListener("resize", handleResize);
 
-    let raf = window.requestAnimationFrame(update);
+    const raf = window.requestAnimationFrame(update);
     let observer: ResizeObserver | undefined;
     if (typeof ResizeObserver !== "undefined") {
       observer = new ResizeObserver(() => update());
@@ -410,12 +424,10 @@ export function PromptCard({ prompt, onUpdated, onDeleted }: PromptCardProps) {
               >
                 {promptData.title}
               </h3>
-              <time
-                dateTime={promptData.updatedAt}
-                className="text-xs font-medium text-slate-500 transition-colors dark:text-slate-400"
-              >
-                {formatUpdatedAt(promptData.updatedAt)}
-              </time>
+              <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-slate-500 transition-colors dark:text-slate-400">
+                <span className={workspaceBadgeClass}>{workspaceLabel}</span>
+                <time dateTime={promptData.updatedAt}>{formatUpdatedAt(promptData.updatedAt)}</time>
+              </div>
             </div>
           </header>
           <div
@@ -488,6 +500,7 @@ export function PromptCard({ prompt, onUpdated, onDeleted }: PromptCardProps) {
         prompt={promptData}
         open={detailsOpen}
         onOpenChange={setDetailsOpen}
+        workspace={workspace}
       />
 
       <EditPromptDialog
@@ -506,12 +519,14 @@ export function PromptCard({ prompt, onUpdated, onDeleted }: PromptCardProps) {
         prompt={promptData}
         open={historyOpen}
         onOpenChange={setHistoryOpen}
+        workspace={workspace}
       />
       <PromptCommentsDialog
         prompt={promptData}
         open={commentsOpen}
         onOpenChange={setCommentsOpen}
         onCommentCountChange={handleCommentCountChange}
+        workspace={workspace}
       />
     </>
   );

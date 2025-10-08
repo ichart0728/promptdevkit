@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { ReactNode, useEffect, useMemo, useState } from "react";
 
 import { PromptCard } from "@/components/prompts/PromptCard";
 import { SearchInput } from "@/components/prompts/SearchInput";
@@ -25,6 +25,10 @@ type PromptListProps = {
   onPromptDeleted: (promptId: string) => void | Promise<void>;
   freePlanLimit?: number;
   onRequestUpgrade: () => void;
+  workspaceControl?: ReactNode;
+  contextControl?: ReactNode;
+  addPromptDisabled?: boolean;
+  addPromptDisabledReason?: string;
 };
 
 type PaginationControlsProps = {
@@ -156,6 +160,10 @@ export function PromptList({
   onPromptDeleted,
   freePlanLimit,
   onRequestUpgrade,
+  workspaceControl,
+  contextControl,
+  addPromptDisabled,
+  addPromptDisabledReason,
 }: PromptListProps) {
   const pageSizeOptions = useMemo(() => [9, 18, 27], []);
   const [pageSize, setPageSize] = useState<number>(pageSizeOptions[0]);
@@ -188,7 +196,8 @@ export function PromptList({
   const promptCount = prompts.length;
   const isOverLimit = limit > 0 && promptCount >= limit;
   const remaining = limit > 0 ? Math.max(limit - promptCount, 0) : 0;
-  const usageProgress = limit > 0 ? Math.min(100, Math.round((promptCount / limit) * 100)) : 0;
+  const usageProgress =
+    limit > 0 ? Math.min(100, Math.round((promptCount / limit) * 100)) : 0;
   const showUsageBanner =
     limit > 0 && (promptCount >= Math.ceil(limit * 0.5) || isOverLimit);
 
@@ -201,16 +210,26 @@ export function PromptList({
     <section className="flex flex-col gap-6">
       <div className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white/70 p-5 shadow-sm transition dark:border-slate-800 dark:bg-slate-900/70 dark:shadow-slate-900/50">
         <div className="flex flex-wrap items-center gap-3">
+          {workspaceControl ? (
+            <div className="flex items-center gap-2">{workspaceControl}</div>
+          ) : null}
           <SearchInput
             value={searchValue}
             onChange={onSearchInputChange}
             onDebouncedChange={onSearchDebouncedChange}
           />
           <div className="ml-auto flex items-center gap-3">
+            {contextControl ? (
+              <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                {contextControl}
+              </div>
+            ) : null}
             <button
               type="button"
               onClick={onAddPrompt}
-              className={addPromptClasses}
+              // className={addPromptClasses}
+              disabled={addPromptDisabled}
+              title={addPromptDisabled ? addPromptDisabledReason : undefined}
               aria-haspopup="dialog"
               aria-label={addPromptLabel}
               aria-disabled={isOverLimit}
@@ -219,7 +238,11 @@ export function PromptList({
             </button>
           </div>
         </div>
-        <TagFilter options={availableTags} selected={selectedTags} onChange={onTagChange} />
+        <TagFilter
+          options={availableTags}
+          selected={selectedTags}
+          onChange={onTagChange}
+        />
         {showUsageBanner ? (
           <div className="flex flex-col gap-3 rounded-2xl border border-purple-200 bg-purple-50/70 p-4 dark:border-purple-500/40 dark:bg-purple-500/10">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -232,7 +255,9 @@ export function PromptList({
                 <p className="text-xs text-purple-700/80 dark:text-purple-200/80">
                   {isOverLimit
                     ? "Upgrade to keep creating prompts without restrictions."
-                    : `You have ${remaining} prompt${remaining === 1 ? "" : "s"} left before hitting the limit.`}
+                    : `You have ${remaining} prompt${
+                        remaining === 1 ? "" : "s"
+                      } left before hitting the limit.`}
                 </p>
               </div>
               <button
@@ -255,7 +280,9 @@ export function PromptList({
 
       {error ? (
         <div className="flex flex-col items-center justify-center gap-4 rounded-3xl border border-red-200 bg-red-50/80 p-10 text-center shadow-sm dark:border-red-500/40 dark:bg-red-900/20">
-          <p className="text-sm font-medium text-red-700 dark:text-red-200">{error}</p>
+          <p className="text-sm font-medium text-red-700 dark:text-red-200">
+            {error}
+          </p>
           <button
             type="button"
             onClick={onRetry}
@@ -282,9 +309,9 @@ export function PromptList({
                   />
                 ))}
             {loading && prompts.length > 0
-              ? Array.from({ length: Math.min(3, pageSize) }).map((_, index) => (
-                  <SkeletonCard key={`loading-${index}`} />
-                ))
+              ? Array.from({ length: Math.min(3, pageSize) }).map(
+                  (_, index) => <SkeletonCard key={`loading-${index}`} />
+                )
               : null}
           </div>
 
@@ -292,7 +319,8 @@ export function PromptList({
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-slate-200 bg-white/70 p-4 text-sm shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
               <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
                 <span>
-                  Page <strong>{safePage}</strong> of <strong>{pageCount}</strong>
+                  Page <strong>{safePage}</strong> of{" "}
+                  <strong>{pageCount}</strong>
                 </span>
                 <span>({prompts.length} prompts)</span>
               </div>
