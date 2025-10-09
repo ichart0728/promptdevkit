@@ -1,9 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
   // output   = "../src/generated/prisma"
@@ -16,183 +13,264 @@ datasource db {
 }
 
 enum TeamRole {
-  member
+  admin
   editor
   viewer
-  admin
+
+  @@map("team_role")
 }
 
 model User {
-  id              String          @id @default(cuid())
-  name            String?
-  email           String?         @unique
-  emailVerified   DateTime?
-  image           String?
-  deletedAt       DateTime?
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  accounts        Account[]
-  sessions        Session[]
-  personalPrompts Prompt[]        @relation("PersonalOwner")
-  createdPrompts  Prompt[]        @relation("CreatedBy")
-  teamMemberships TeamMember[]
-  ownedTeams      Team[]          @relation("TeamOwner")
-  runLogs         RunLog[]
-  PromptComment   PromptComment[]
+  id                  String           @id @default(uuid()) @db.Uuid
+  email               String?          @unique
+  hashedPassword      String?
+  name                String?
+  avatarUrl           String?
+  locale              String?          @default("en")
+  timeZone            String?
+  lastSeenAt          DateTime?        @db.Timestamptz
+  onboardedAt         DateTime?        @db.Timestamptz
+  deletedAt           DateTime?        @db.Timestamptz
+  createdAt           DateTime         @default(now()) @db.Timestamptz
+  updatedAt           DateTime         @updatedAt @db.Timestamptz
+  userPlans           UserPlan[]
+  workspaces          Workspace[]      @relation("WorkspaceOwner")
+  teamsOwned          Team[]           @relation("TeamOwner")
+  teamMemberships     TeamMember[]
+  promptsCreated      Prompt[]         @relation("PromptCreatedBy")
+  promptFavorites     PromptFavorite[]
+  commentThreads      CommentThread[]  @relation("ThreadCreatedBy")
+  comments            Comment[]
+  notifications       Notification[]   @relation("NotificationRecipient")
+  notificationEvents  Notification[]   @relation("NotificationActor")
+
+  @@map("users")
 }
 
-model Account {
-  id                String  @id @default(cuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String?
-  access_token      String?
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String?
-  session_state     String?
-  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+model Plan {
+  id                String       @id @default(uuid()) @db.Uuid
+  slug              String       @unique
+  name              String
+  description       String?
+  isActive          Boolean      @default(true)
+  isDefault         Boolean      @default(false)
+  monthlyPriceCents Int?
+  annualPriceCents  Int?
+  currency          String?      @default("usd")
+  createdAt         DateTime     @default(now()) @db.Timestamptz
+  updatedAt         DateTime     @updatedAt @db.Timestamptz
+  limits            PlanLimit[]
+  userPlans         UserPlan[]
 
-  @@unique([provider, providerAccountId])
+  @@index([isDefault])
+  @@map("plans")
+}
+
+model PlanLimit {
+  id        String   @id @default(uuid()) @db.Uuid
+  planId    String   @db.Uuid
+  key       String
+  value     Int
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  plan      Plan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, key])
+  @@index([key])
+  @@map("plan_limits")
+}
+
+model UserPlan {
+  id             String    @id @default(uuid()) @db.Uuid
+  userId         String    @db.Uuid
+  planId         String    @db.Uuid
+  status         String    @default("active")
+  subscriptionId String?   @unique
+  trialEndsAt    DateTime? @db.Timestamptz
+  periodStart    DateTime  @default(now()) @db.Timestamptz
+  periodEnd      DateTime? @db.Timestamptz
+  cancelAt       DateTime? @db.Timestamptz
+  createdAt      DateTime  @default(now()) @db.Timestamptz
+  updatedAt      DateTime  @updatedAt @db.Timestamptz
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan           Plan      @relation(fields: [planId], references: [id], onDelete: Cascade)
+
   @@index([userId])
+  @@index([planId])
+  @@index([status])
+  @@map("user_plans")
 }
 
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
+model Workspace {
+  id          String    @id @default(uuid()) @db.Uuid
+  ownerId     String    @db.Uuid
+  name        String
+  slug        String
+  description String?
+  tags        String[]  @default([])
+  isDefault   Boolean   @default(false)
+  deletedAt   DateTime? @db.Timestamptz
+  createdAt   DateTime  @default(now()) @db.Timestamptz
+  updatedAt   DateTime  @updatedAt @db.Timestamptz
+  owner       User      @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  teams       Team[]
+  prompts     Prompt[]
 
-model VerificationToken {
-  identifier String
-  token      String
-  expires    DateTime
-
-  @@unique([identifier, token])
-  @@index([expires])
+  @@unique([ownerId, slug])
+  @@index([slug])
+  @@map("workspaces")
 }
 
 model Team {
-  id        String       @id @default(cuid())
-  name      String
-  ownerId   String?
-  deletedAt DateTime?
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
-  owner     User?        @relation("TeamOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  members   TeamMember[]
-  prompts   Prompt[]     @relation("PromptTeam")
+  id          String    @id @default(uuid()) @db.Uuid
+  workspaceId String    @db.Uuid
+  ownerId     String?   @db.Uuid
+  name        String
+  slug        String
+  description String?
+  tags        String[]  @default([])
+  createdAt   DateTime  @default(now()) @db.Timestamptz
+  updatedAt   DateTime  @updatedAt @db.Timestamptz
+  archivedAt  DateTime? @db.Timestamptz
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  owner       User?     @relation("TeamOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  members     TeamMember[]
+  prompts     Prompt[]
+
+  @@unique([workspaceId, slug])
+  @@index([ownerId])
+  @@map("teams")
 }
 
 model TeamMember {
-  id        String   @id @default(cuid())
-  teamId    String
-  userId    String
-  role      TeamRole @default(member)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String   @id @default(uuid()) @db.Uuid
+  teamId    String   @db.Uuid
+  userId    String   @db.Uuid
+  role      TeamRole @default(viewer)
+  invitedBy String?  @db.Uuid
+  joinedAt  DateTime @default(now()) @db.Timestamptz
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([teamId, userId])
   @@index([userId])
+  @@index([role])
+  @@map("team_members")
 }
 
 model Prompt {
-  id          String    @id @default(cuid())
-  title       String
-  body        String
-  variables   Json
-  logging     Boolean   @default(false)
-  ownerId     String?
-  teamId      String?
-  createdById String?
-  archivedAt  DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  notes       String?
+  id            String            @id @default(uuid()) @db.Uuid
+  workspaceId   String            @db.Uuid
+  teamId        String?           @db.Uuid
+  createdById   String            @db.Uuid
+  title         String
+  description   String?
+  tags          String[]          @default([])
+  isArchived    Boolean           @default(false)
+  archivedAt    DateTime?         @db.Timestamptz
+  publishedAt   DateTime?         @db.Timestamptz
+  createdAt     DateTime          @default(now()) @db.Timestamptz
+  updatedAt     DateTime          @updatedAt @db.Timestamptz
+  workspace     Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  team          Team?             @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  createdBy     User              @relation("PromptCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+  versions      PromptVersion[]
+  favorites     PromptFavorite[]
+  commentThreads CommentThread[]
 
-  owner     User? @relation("PersonalOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  team      Team? @relation("PromptTeam", fields: [teamId], references: [id], onDelete: SetNull)
-  createdBy User? @relation("CreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-
-  versions PromptVersion[]
-  runLogs  RunLog[]
-  tags     TagOnPrompt[]
-  comments PromptComment[]
-
-  @@index([ownerId, updatedAt])
+  @@index([workspaceId, updatedAt])
   @@index([teamId, updatedAt])
+  @@index([createdById])
+  @@map("prompts")
 }
 
 model PromptVersion {
-  id        String   @id @default(cuid())
-  promptId  String
-  version   Int
-  title     String
-  body      String
-  variables Json
-  createdAt DateTime @default(now())
-
-  prompt Prompt @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  id           String   @id @default(uuid()) @db.Uuid
+  promptId     String   @db.Uuid
+  version      Int
+  name         String
+  body         String
+  variables    Json?
+  metadata     Json?
+  createdById  String?  @db.Uuid
+  createdAt    DateTime @default(now()) @db.Timestamptz
+  prompt       Prompt   @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  createdBy    User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
 
   @@unique([promptId, version])
+  @@index([createdById])
+  @@map("prompt_versions")
 }
 
-model RunLog {
-  id        String   @id @default(cuid())
-  promptId  String
-  userId    String?
-  variables Json
-  result    String?
-  createdAt DateTime @default(now())
+model PromptFavorite {
+  id        String   @id @default(uuid()) @db.Uuid
+  promptId  String   @db.Uuid
+  userId    String   @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz
+  prompt    Prompt   @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  prompt Prompt @relation(fields: [promptId], references: [id], onDelete: Cascade)
-  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  @@unique([promptId, userId])
+  @@index([userId])
+  @@map("prompt_favorites")
+}
+
+model CommentThread {
+  id           String    @id @default(uuid()) @db.Uuid
+  promptId     String    @db.Uuid
+  createdById  String    @db.Uuid
+  title        String?
+  isResolved   Boolean   @default(false)
+  resolvedAt   DateTime? @db.Timestamptz
+  createdAt    DateTime  @default(now()) @db.Timestamptz
+  updatedAt    DateTime  @updatedAt @db.Timestamptz
+  prompt       Prompt    @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  createdBy    User      @relation("ThreadCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+  comments     Comment[]
 
   @@index([promptId, createdAt])
-  @@index([userId, createdAt])
+  @@index([isResolved])
+  @@map("comment_threads")
 }
 
-model Tag {
-  id        String        @id @default(cuid())
-  name      String        @unique
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
-  prompts   TagOnPrompt[]
+model Comment {
+  id          String    @id @default(uuid()) @db.Uuid
+  threadId    String    @db.Uuid
+  authorId    String    @db.Uuid
+  parentId    String?   @db.Uuid
+  body        String
+  mentions    String[]  @default([])
+  editedAt    DateTime? @db.Timestamptz
+  deletedAt   DateTime? @db.Timestamptz
+  createdAt   DateTime  @default(now()) @db.Timestamptz
+  updatedAt   DateTime  @updatedAt @db.Timestamptz
+  thread      CommentThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  author      User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parent      Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies     Comment[] @relation("CommentReplies")
+
+  @@index([threadId, createdAt])
+  @@index([authorId])
+  @@map("comments")
 }
 
-model TagOnPrompt {
-  promptId  String
-  tagId     String
-  createdAt DateTime @default(now())
+model Notification {
+  id          String   @id @default(uuid()) @db.Uuid
+  recipientId String   @db.Uuid
+  actorId     String?  @db.Uuid
+  type        String
+  data        Json?
+  readAt      DateTime? @db.Timestamptz
+  createdAt   DateTime  @default(now()) @db.Timestamptz
+  updatedAt   DateTime  @updatedAt @db.Timestamptz
+  recipient   User     @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  actor       User?    @relation("NotificationActor", fields: [actorId], references: [id], onDelete: SetNull)
 
-  prompt Prompt @relation(fields: [promptId], references: [id], onDelete: Cascade)
-  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
-
-  @@id([promptId, tagId])
+  @@index([recipientId, readAt])
+  @@index([actorId])
+  @@index([type])
+  @@map("notifications")
 }
 
-model PromptComment {
-  id        String   @id @default(cuid())
-  promptId  String
-  authorId  String?
-  parentId  String?
-  body      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  prompt  Prompt          @relation(fields: [promptId], references: [id], onDelete: Cascade)
-  author  User?           @relation(fields: [authorId], references: [id], onDelete: SetNull)
-  parent  PromptComment?  @relation("PromptCommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies PromptComment[] @relation("PromptCommentReplies")
-
-  @@index([promptId, createdAt])
-  @@index([parentId, createdAt])
-}
